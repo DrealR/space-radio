@@ -63,8 +63,9 @@ exercise the "ended" and "busy" crew states. It is ignored on Vercel.
 
 - `public/` is the static site. `api/tune.py` and `api/status.py` are Python functions that call `spaces_radio/`.
 - The X key lives only in the Vercel environment (`X_BEARER_TOKEN`). Listeners never need a key.
-- **One key, many listeners.** `/api/tune` answers carry `Vercel-CDN-Cache-Control: max-age=600`,
-  so everyone on the same band in the same 10 minutes shares one answer, and X is asked once.
+- **One key, many listeners.** `/api/tune` and `/api/search` answers carry `Vercel-CDN-Cache-Control: max-age=1800`,
+  so everyone on the same band in the same 30 minutes shares one answer, and X is asked once.
+  (Every deploy clears that cache, so a deploy costs one fresh search per band someone opens.)
   Any extra query parameter, or any other spelling of the same one (`%6dusic`, a trailing `&`), is refused,
   so nobody can bypass that cache and run up the bill.
 - Add the key: `vercel env add X_BEARER_TOKEN production`, paste the token, then redeploy.
@@ -73,22 +74,27 @@ exercise the "ended" and "busy" crew states. It is ignored on Vercel.
 
 ## What it costs
 
-X's API is pay-per-use: **$0.005 per room returned**, and a room is charged once per UTC day
-no matter how often it's seen. So cost follows *how many distinct rooms show up*, not how many people listen.
+X's API is pay-per-use: **$0.005 per room returned**. The docs say each room is billed once per UTC day,
+but the first real day (Sep 24, 2026) showed **576 billed items from 51 requests ($2.92)**: in practice X
+billed nearly every room on every request. So cost follows **how many searches reach X**, which the
+shared cache keeps independent of how many people listen.
 
-- Every search asks for up to 10 rooms, and each band runs 1 to 3 searches.
-- If one person listens a few hours a day, expect roughly $0.50 to $2 a day. This is a guess; measure the first week.
+- Each search asks for up to 10 rooms (up to about $0.05), and each band runs 2 searches (up to about $0.10).
+- A band's answer is shared for 30 minutes, and an open radio refreshes only every 30 minutes, only while visible.
+- One person listening a few hours on one or two bands: roughly $0.20 to $0.60 an hour of fresh searches at most,
+  often less, because the cache is shared. Browsing all ten bands once costs up to about $1.
+- Your own bands work the same way: two words, two searches.
 - **The hard cap lives at X.** In the X Developer Console, set a spending limit per billing cycle (for example $10)
   and leave auto-recharge off. When the limit is hit, X blocks calls and the radio shows "signal trouble".
-- The server also keeps a soft daily guard (`SPACES_RADIO_DAILY_CAP`, default $0.50), but on Vercel
+- The server also keeps a soft daily guard (`SPACES_RADIO_DAILY_CAP`, default $1.00, counting every room on
+  every call), but on Vercel
   each instance keeps its own, so don't rely on it as the cap.
 
 ### Crew names cost more
 
 The crew manifest asks X for one Space plus its people: **$0.005 per Space and $0.010 per person**
-(user reads are billed per user returned), both deduplicated per UTC day. A typical room (1 host,
-2 co-hosts, 8 speakers) costs about $0.11 on its first scan of the day, and about $0 after that,
-plus $0.010 for each new person on the mic. So names load only when someone asks:
+(user reads are billed per user returned). Assume every scan is billed in full: a typical room (1 host,
+2 co-hosts, 8 speakers) costs about $0.12 per scan. So names load only when someone asks:
 
 - **Only a press scans**: the speaker, the C key, TRY AGAIN or REFRESH. Never on load, tuning, band
   switches, SCAN, the 10-minute refresh or PUSH.

@@ -14,6 +14,9 @@ function screenText(room, s, host) {
   if (!room && s.english && s.live.length) return { title: "ONLY OTHER LANGUAGES HERE", info: "FLIP EN OFF TO HEAR THEM" };
   if (!room) return { title: "DEAD AIR ON THIS BAND", info: "TRY ANOTHER BAND" };
   const lead = host ? `HOST @${host}` : "";
+  if (room.beamed && room.listeners == null) {
+    return { title: room.title, info: [lead, "BEAMED IN · PUSH TO JOIN"].filter(Boolean).join(" · ") };
+  }
   if (room.source === "yours" && room.listeners == null) {
     const slot = s.presets.findIndex((p) => p.id === room.id) + 1;
     return { title: room.title, info: [lead, `PRESET P${slot} · MAY HAVE ENDED`].filter(Boolean).join(" · ") };

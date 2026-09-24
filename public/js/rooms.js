@@ -6,7 +6,8 @@ const FM_LOW = 88.1;
 const FM_HIGH = 107.9;
 
 const BAND_LABELS = { anything: "ANY", "late night": "LATE" };
-export const bandLabel = (name) => BAND_LABELS[name] || name.toUpperCase().slice(0, 6);
+export const bandLabel = (name) =>
+  (name.startsWith("my:") ? name.slice(3) : BAND_LABELS[name] || name.toUpperCase()).slice(0, 6);
 
 const SORTS = {
   busy: (a, b) => b.listeners - a.listeners,

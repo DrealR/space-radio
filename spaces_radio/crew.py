@@ -169,10 +169,7 @@ class CrewLookup:
         return body
 
     def _reserve_space(self, sid: str) -> frozenset:
-        """An empty hold when this room was already paid for today, by the dial or a lookup."""
-        ledgers = (self._spaces,) + ((self._band,) if self._band else ())
-        if any(sid in b.ledger().paid_ids for b in ledgers):
-            return frozenset()
+        """Hold one Space read for the probe. X bills it even if the dial saw the room today."""
         held = self._spaces.try_reserve(1, tag=sid)
         if held is None:
             raise self._refuse(sid, "probe", "budget", f"crew Space-read cap ${self._spaces.cap:.2f} reached")
@@ -181,7 +178,7 @@ class CrewLookup:
     def _reserve_names(self, sid: str, probe_body: dict, trusted: bool) -> Tuple[str, frozenset, int]:
         """Price the crew from the probe's id lists: hold everyone if it fits, else the host."""
         if trusted:
-            need = len(crew_ids(probe_body) - self._users.ledger().paid_ids) + JOIN_MARGIN
+            need = len(crew_ids(probe_body)) + JOIN_MARGIN  # every name is billed on every scan
             held = self._users.try_reserve(need, tag=sid)
             if held is not None:
                 return "full", held, need

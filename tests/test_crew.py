@@ -235,7 +235,7 @@ class CrewBudgetTests(TmpCase):
         b.charge(["a"])
         self.assertAlmostEqual(b.ledger().spent, PRICE_PER_SPACE)
         saved = json.loads((self.dir / "b.json").read_text())
-        self.assertEqual(saved["paid_ids"], ["a"])
+        self.assertEqual(saved["paid_ids"], ["0:a"])  # keyed per call: repeats are billed again
 
 
 class CrewLookupTests(TmpCase):
@@ -246,7 +246,7 @@ class CrewLookupTests(TmpCase):
         self.lines = []
         return CrewLookup("tok", self.spaces, self.users, fetch=fake, now=self.clock, log=self.lines.append, **extra)
 
-    def test_full_scan_charges_each_person_once_per_day(self):
+    def test_full_scan_charges_everyone_on_every_scan(self):
         fake = FakeCrewX(crew_body())
         crew = self.make(fake)
         scan, cached = crew.scan(SID)
@@ -259,8 +259,8 @@ class CrewLookupTests(TmpCase):
         self.clock.t += 121
         crew.scan(SID)
         self.assertEqual(len(fake.urls), 4)
-        self.assertAlmostEqual(self.users.ledger().spent, 3 * PRICE_PER_USER)
-        self.assertAlmostEqual(self.spaces.ledger().spent, PRICE_PER_SPACE)
+        self.assertAlmostEqual(self.users.ledger().spent, 6 * PRICE_PER_USER)
+        self.assertAlmostEqual(self.spaces.ledger().spent, 2 * PRICE_PER_SPACE)
 
     def test_users_x_returns_are_charged_even_when_dropped(self):
         crew = self.make(FakeCrewX(crew_body(users=USERS + [user("99", "bad handle!"), {"name": "no id"}])))

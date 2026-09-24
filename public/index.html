@@ -25,6 +25,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Mono:wght@400;700&family=VT323&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="crew.css">
+  <link rel="stylesheet" href="radar.css">
+  <link rel="stylesheet" href="bands.css">
 </head>
 <body>
   <!-- Glyphs the web fonts don't carry (and some phones draw as emoji). -->
@@ -82,7 +84,10 @@
           <div id="needle" class="needle" aria-hidden="true"></div>
         </section>
 
-        <div class="dymo" aria-hidden="true">BAND</div>
+        <div class="band-head">
+          <div class="dymo" aria-hidden="true">BAND</div>
+          <button type="button" id="radar-btn" class="radar-btn" aria-haspopup="dialog" title="Radar: every ship on this band (R)">◎ RADAR</button>
+        </div>
         <nav id="bands" class="bands" aria-label="Bands"></nav>
 
         <section class="deck">
@@ -92,7 +97,10 @@
               <div id="grille-key" class="grille-key"></div>
               <span id="speaker-cta" class="speaker-cta">WHO'S HERE <svg class="g" aria-hidden="true" focusable="false"><use href="#g-tri"/></svg></span>
             </button>
-            <a id="open-x" class="open-x" href="#" target="_blank" rel="noopener noreferrer" hidden>OPEN IN X <svg class="g" aria-hidden="true"><use href="#g-out"/></svg></a>
+            <div class="speaker-links">
+              <a id="open-x" class="open-x" href="#" target="_blank" rel="noopener noreferrer" hidden>OPEN IN X <svg class="g" aria-hidden="true"><use href="#g-out"/></svg></a>
+              <button type="button" id="beam" class="open-x beam" hidden title="Send a friend a link to this room">BEAM ✦</button>
+            </div>
           </div>
 
           <div class="controls">
@@ -170,6 +178,9 @@
         <li><b>OPEN IN X <svg class="g" aria-hidden="true"><use href="#g-out"/></svg></b> shows the room on X itself.</li>
         <li><b>SCAN</b> (computer) lines up a new room every few minutes; push to jump.</li>
         <li><b>EN</b> hides rooms X marks as another language.</li>
+        <li><b>◎ RADAR</b> shows every ship on the band as a blip. Nearer the centre means a bigger crowd, and a green halo means voices on the mic. Tap a ship to tune to it.</li>
+        <li><b>＋</b> at the end of the bands makes your own: a short name and up to two search words, like guitar or Detroit.</li>
+        <li><b>BEAM ✦</b> sends a friend a link that opens their radio on the room you're on, so you can hang out in the same Space.</li>
       </ol>
 
       <h2>Why two buttons?</h2>
@@ -189,7 +200,7 @@
       <p>Names come from X, which charges this radio's owner about a cent per person, so they load only when you open the crew, and everyone on the radio shares each scan for two minutes. X shares how many people are listening, not who.</p>
 
       <h2 class="desk-only">Keys</h2>
-      <p class="keys desk-only"><kbd aria-label="Left arrow"><svg class="g" aria-hidden="true" focusable="false"><use href="#g-left"/></svg></kbd> <kbd aria-label="Right arrow"><svg class="g" aria-hidden="true" focusable="false"><use href="#g-right"/></svg></kbd> tune · <kbd>L</kbd> listen · <kbd>H</kbd> I hear it · <kbd>C</kbd> crew · <kbd>O</kbd> open in X · <kbd>?</kbd> manual · <kbd>Esc</kbd> close</p>
+      <p class="keys desk-only"><kbd aria-label="Left arrow"><svg class="g" aria-hidden="true" focusable="false"><use href="#g-left"/></svg></kbd> <kbd aria-label="Right arrow"><svg class="g" aria-hidden="true" focusable="false"><use href="#g-right"/></svg></kbd> tune · <kbd>L</kbd> listen · <kbd>H</kbd> I hear it · <kbd>C</kbd> crew · <kbd>R</kbd> radar · <kbd>O</kbd> open in X · <kbd>?</kbd> manual · <kbd>Esc</kbd> close</p>
 
       <h2>Program a preset</h2>
       <p>Found a live room on your phone or in a post? Paste its link and it gets a preset button. Presets live in this browser only.</p>

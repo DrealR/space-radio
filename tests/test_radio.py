@@ -70,11 +70,12 @@ class ParseTests(unittest.TestCase):
 
 
 class BudgetTests(TmpCase):
-    def test_charges_each_space_once_per_day(self):
+    def test_charges_every_space_on_every_call(self):
+        # X's first real bill (Sep 24) showed no reliable daily dedupe, so repeats count again.
         b = Budget(self.dir / "b.json", daily_cap=1.0, clock=lambda: "2026-09-23")
         b.charge([ID_A, ID_B])
         b.charge([ID_A])
-        self.assertAlmostEqual(b.ledger().spent, 2 * PRICE_PER_SPACE)
+        self.assertAlmostEqual(b.ledger().spent, 3 * PRICE_PER_SPACE)
         self.assertEqual(b.ledger().calls, 2)
 
     def test_refuses_call_that_could_pass_cap(self):

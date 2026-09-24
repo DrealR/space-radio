@@ -1,0 +1,59 @@
+/* Bridge scope: a green phosphor radar projected from the radio. Uses app.css tokens. */
+.radar { border: 0; padding: 0; background: transparent; max-width: calc(100vw - 24px); color: var(--vfd); }
+.radar::backdrop { background: rgba(4, 8, 10, .74); backdrop-filter: blur(4px); }
+.radar-card {
+  width: min(460px, calc(100vw - 24px)); padding: 18px 18px 16px; border-radius: 18px;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(20, 60, 48, .95), rgba(4, 18, 15, .96));
+  box-shadow: inset 0 0 0 1px rgba(109, 255, 200, .28), 0 30px 60px rgba(0, 0, 0, .6), 0 0 40px rgba(109, 255, 200, .08);
+  font-family: var(--mono); animation: radar-rise .28s ease-out both;
+}
+@keyframes radar-rise { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.radar-head { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: start; margin-bottom: 12px; }
+.radar-kicker { grid-column: 1; margin: 0; font: 700 11px/1.4 var(--mono); letter-spacing: .24em; opacity: .75; }
+.radar-title { grid-column: 1; margin: 0; font: 32px/1 var(--lcd); text-shadow: 0 0 8px rgba(109, 255, 200, .6); }
+.radar-x { grid-column: 2; grid-row: 1 / span 2; width: 44px; height: 44px; border-radius: 10px; cursor: pointer;
+  background: transparent; color: var(--vfd); border: 1px solid rgba(109, 255, 200, .35); font-size: 16px; }
+
+.scope {
+  position: relative; width: min(380px, calc(100vw - 72px)); aspect-ratio: 1; margin: 4px auto 12px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(18, 70, 52, .9), rgba(3, 16, 12, 1) 72%);
+  box-shadow: inset 0 0 0 2px rgba(109, 255, 200, .35), inset 0 0 40px rgba(0, 0, 0, .8), 0 0 30px rgba(109, 255, 200, .12);
+  overflow: hidden;
+}
+.scope-rings { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background:
+    repeating-radial-gradient(circle, transparent 0 calc(12.5% - 1px), rgba(109, 255, 200, .16) calc(12.5% - 1px) 12.5%),
+    linear-gradient(transparent calc(50% - .5px), rgba(109, 255, 200, .18) calc(50% - .5px) calc(50% + .5px), transparent 0),
+    linear-gradient(90deg, transparent calc(50% - .5px), rgba(109, 255, 200, .18) calc(50% - .5px) calc(50% + .5px), transparent 0); }
+/* The bright edge leads clockwise; the phosphor trail fades behind it. */
+.scope-sweep { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0 290deg, rgba(109, 255, 200, .05) 300deg, rgba(109, 255, 200, .38) 360deg);
+  animation: sweep var(--sweep, 4s) linear infinite; }
+@keyframes sweep { to { transform: rotate(360deg); } }
+
+.scope-blips { position: absolute; inset: 0; }
+.blip { position: absolute; width: calc(var(--s) + 16px); height: calc(var(--s) + 16px); padding: 0; border: 0;
+  transform: translate(-50%, -50%); background: transparent; border-radius: 50%; cursor: pointer; display: grid; place-items: center; }
+.blip-core { width: var(--s); height: var(--s); border-radius: 50%; background: var(--host);
+  box-shadow: 0 0 10px rgba(255, 177, 59, .7); animation: ping var(--sweep, 4s) linear var(--d, 0s) infinite; }
+.blip.mic .blip-core { box-shadow: 0 0 0 3px rgba(125, 255, 154, .45), 0 0 14px rgba(125, 255, 154, .8); }
+.blip.mine .blip-core { background: #8fd3ff; box-shadow: 0 0 10px rgba(143, 211, 255, .7); }
+.blip.current::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #fffaf0;
+  box-shadow: 0 0 12px rgba(255, 250, 240, .6); }
+.blip:hover .blip-core, .blip:focus-visible .blip-core { transform: scale(1.25); }
+.blip:focus-visible { outline: 2px solid #fffaf0; outline-offset: 2px; }
+@keyframes ping { 0% { filter: brightness(2.2); transform: scale(1.35); } 18%, 100% { filter: none; transform: scale(1); } }
+
+.radar-readout { min-height: 2.8em; margin: 0 0 6px; font: 22px/1.25 var(--lcd); text-align: center; overflow-wrap: anywhere; }
+.radar-legend { margin: 0; font-size: 11px; line-height: 1.5; opacity: .7; text-align: center; }
+
+.band-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.radar-btn { min-height: 32px; padding: 4px 11px 3px; border: 0; border-radius: 2px; cursor: pointer;
+  background: #0c2a21; color: var(--vfd); font: 700 10px/1.5 var(--mono); letter-spacing: .2em;
+  transform: rotate(1deg); box-shadow: 0 1px 2px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(109, 255, 200, .45); }
+.radar-btn:hover { box-shadow: 0 1px 2px rgba(0, 0, 0, .4), inset 0 0 0 2px rgba(109, 255, 200, .7); }
+[data-kind="phone"] .radar-btn { min-height: 44px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scope-sweep, .blip-core, .radar-card { animation: none; }
+}

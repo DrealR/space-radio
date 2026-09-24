@@ -57,7 +57,8 @@ browser (the radio) ──▶ /api/tune?station=music ──▶ X API: search li
 ```
 
 - One key serves every listener. Listeners never need a developer account.
-- X charges $0.005 per room, once per day, so the cost follows how many rooms show up, not how many
+- X charges $0.005 per room returned, and in practice on every request, so the shared cache is what keeps
+  the cost tied to searches rather than to how many
   people listen. X's spending limit is the hard cap.
 - Written with *Head First Design Patterns*, chapter 1 (Strategy): the radio asks a `SpaceSource`
   for rooms and doesn't care where they come from. Clubhouse or Telegram voice chats would be one

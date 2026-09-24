@@ -31,8 +31,9 @@ from .fixtures import make_fake_fetch
 from .sources import SourceError, SpaceSource, XApiSource, _http_get_json
 from .stations import STATIONS, tune
 from .ticket import Tickets, ticket_key
+from .words import word_from_raw
 
-FRESH_SECONDS = 600     # a good answer is shared for 10 minutes
+FRESH_SECONDS = 1800    # a good answer is shared for 30 minutes (each fresh search is billed)
 TROUBLE_SECONDS = 60    # a partial or failed answer is retried sooner
 STATUS_SECONDS = 300
 ALLOWED_PARAMS = {"station"}
@@ -88,6 +89,21 @@ class RadioService:
         if raw_query not in TUNE_QUERIES:
             return Reply(400, envelope(error="Only ?station=<band> is accepted."))
         return self.tune(parse_qs(raw_query, keep_blank_values=True))
+
+    def search_raw(self, raw_query: str) -> Reply:
+        """GET /api/search?q=<word>: one word for a band someone made. Same sharing and cost
+        rules as a built-in band's word: cached per word, X bills per room found."""
+        word = word_from_raw(raw_query)
+        if not word:
+            return Reply(400, envelope(error="Search words are 2-30 letters, numbers, spaces, # $ or -."))
+        if not self._source:
+            return Reply(200, envelope([], meta={"word": word, "problems": []}), STATUS_SECONDS)
+        try:
+            rooms = [r.tagged("yours") for r in self._source.live(word)]
+        except SourceError as err:
+            return Reply(502, envelope(error=str(err), meta={"word": word}), TROUBLE_SECONDS)
+        return Reply(200, envelope([self._ticketed(r.to_json()) for r in rooms],
+                                   meta={"word": word, "problems": []}), FRESH_SECONDS)
 
     def crew_raw(self, raw_query: str) -> Reply:
         """GET /api/crew from the raw query string: exactly ?id=<id>, optionally &t=<ticket>."""

@@ -20,12 +20,16 @@ import { wireKeys } from "./js/keys.js";
 import { onSwipe, wireKnob } from "./js/knob.js";
 import { copyRoomLink, openHandoff } from "./js/mic.js";
 import { rogerBeep, staticBurst, tick as detent } from "./js/sfx.js";
+import { openRadar } from "./js/radar.js";
+import { bandKey, findBand, isMine, loadBands, mergeRooms, searchPath } from "./js/mybands.js";
+import { readBeam } from "./js/beam.js";
+import { beamCurrent, landBeam, makeBand, MYBANDS_KEY } from "./js/bridge.js";
 
 const HUNT_URL = "https://x.com/search?q=%22x.com%2Fi%2Fspaces%22&f=live";
 const PREFS_KEY = "spaces-radio:prefs";
 const INAPP_KEY = "spaces-radio:inapp-dismissed";
 const BOOT_KEY = "spaces-radio:booted";
-const REFRESH_MS = 10 * 60000;
+const REFRESH_MS = 30 * 60000; // matches the server's shared cache; every fresh search is billed
 const RETRY_STATUS_MS = 60000;
 const KNOB_STEP_DEG = 36;
 
@@ -44,13 +48,16 @@ let state = {
   bands: [], band: "anything", live: [], presets: [], sort: "busy", currentId: null,
   air: AIR_IDLE, airTitle: "", rosters: {}, ended: [], learned: LEARNED_NONE, popupsBlocked: false,
   scan: false, scanMin: 5, scanAt: 0, sfx: true, english: true, liveSearch: false,
-  loading: true, problems: [], flash: "", turn: 0,
+  loading: true, problems: [], flash: "", turn: 0, myBands: [], beam: null,
 };
 let flashTimer = 0;
 let userActed = false; // browsers only allow sound after a tap or key press
 
 const set = (patch) => { state = { ...state, ...patch }; render(); };
-const deckFor = (live) => buildDeck(onlyEnglish(live, state.english), state.sort, state.presets);
+// A beamed room rides at the end of the deck (like a preset) until it turns up live.
+const withBeam = (presets) => (state.beam && !presets.some((p) => p.id === state.beam.id) ? [...presets, state.beam] : presets);
+const deckFor = (live) => buildDeck(onlyEnglish(live, state.english), state.sort, withBeam(state.presets))
+  .map((r) => (state.beam && r.id === state.beam.id && r.listeners == null ? { ...r, beamed: true } : r));
 const deck = () => deckFor(state.live);
 function currentIndex(d = deck()) {
   const i = d.findIndex((r) => r.id === state.currentId);
@@ -132,6 +139,17 @@ function step(delta) {
   announceTune();
 }
 
+async function fetchBand(band) {
+  if (!isMine(band)) return api(`/api/tune?station=${encodeURIComponent(band)}`);
+  const mine = findBand(state.myBands, band);
+  if (!mine) return { error: "That band was cleared." };
+  const answers = await Promise.all(mine.words.map((w) => api(searchPath(w))));
+  const good = answers.filter((a) => !a.error);
+  if (!good.length) return { error: answers[0]?.error || "No answer for your band." };
+  const problems = answers.filter((a) => a.error).map((a) => a.error);
+  return { data: mergeRooms(good.map((a) => (Array.isArray(a.data) ? a.data : []))), meta: { problems } };
+}
+
 async function tuneBand(band, { refresh = false } = {}) {
   const switching = !refresh;
   if (switching) {
@@ -139,7 +157,7 @@ async function tuneBand(band, { refresh = false } = {}) {
     set({ band, live: [], loading: true, problems: [] });
     savePrefs();
   }
-  const res = await api(`/api/tune?station=${encodeURIComponent(band)}`);
+  const res = await fetchBand(band);
   if (res.error) return set({ loading: false, problems: [res.error] });
   const keepId = switching ? null : state.currentId;
   const live = Array.isArray(res.data) ? res.data.filter((r) => r && parseSpaceId(r.id) === r.id) : [];
@@ -170,6 +188,7 @@ function renderSpeaker(room) {
   const people = room?.listeners == null ? "" : `${room.listeners} aboard. `;
   speaker.setAttribute("aria-label", room ? `${people}See who's here` : "No room tuned");
   speaker.classList.toggle("fresh", !state.learned.crew);
+  $("beam").hidden = !room;
   const openX = $("open-x");
   openX.hidden = !room;
   openX.href = (room && spaceUrl(room.id)) || "#";
@@ -197,7 +216,8 @@ function render() {
   const room = d[i] || null;
   const shown = withRoster(room, state.rosters);
   const copy = airCopy(state.air, copyCtx(d));
-  renderBands(state.bands, state.band, tuneBand);
+  renderBands(state.bands, state.band, tuneBand, {
+    mine: state.myBands.map((b) => ({ key: bandKey(b), words: b.words })), onAdd: () => makeBand(app) });
   renderScreen({ room: shown, d, i, state, lcd: copy.lcd, host: room && freshRoster(state.rosters, room.id)?.host });
   renderGlass(d, i, { onSelect: select, playing: state.air.phase === "onair" ? state.air.roomId : null, ended: state.ended });
   renderGrille(shown);
@@ -211,12 +231,13 @@ function render() {
 // The modules below see the app through this one door.
 const app = {
   get state() { return state; },
-  device, set, render, flash, say, current, deck, step, select, sfxOk, nextScan, channelLabel,
+  device, set, render, flash, say, current, deck, step, select, sfxOk, nextScan, channelLabel, tuneBand,
   copy: () => airCopy(state.air, copyCtx()),
   learn: (patch) => set({ learned: learn(state.learned, patch) }),
 };
 const launch = createLaunch(app);
 const openCrew = () => showCrew(app, launch);
+const showRadar = () => openRadar({ rooms: deck(), currentId: current()?.id, band: state.band }, (id) => select(id));
 
 // ---- wiring -------------------------------------------------------------------------------
 function showManual() {
@@ -240,6 +261,8 @@ function wireLaunch() {
   $("preflight-go").addEventListener("click", launch.preflightGo);
   $("preflight-close").addEventListener("click", () => $("preflight").close());
   $("speaker").addEventListener("click", openCrew);
+  $("radar-btn").addEventListener("click", showRadar);
+  $("beam").addEventListener("click", () => beamCurrent(app));
   $("open-x").addEventListener("click", launch.openXClick);
   $("open-x").title = "The room on X: everyone aboard. To listen with the radio, use PUSH.";
   if (phone) $("open-x").removeAttribute("target");
@@ -248,7 +271,7 @@ function wireLaunch() {
   document.addEventListener("visibilitychange", launch.returned);
   wireKeys({
     blocked: () => Boolean(document.querySelector("dialog[open]")) || isCrewShowing(),
-    tune: step, push: () => $("ptt").click(), heard: launch.heard, crew: openCrew,
+    tune: step, push: () => $("ptt").click(), heard: launch.heard, crew: openCrew, radar: showRadar,
     openX: launch.openInX, manual: showManual, escape: launch.dismiss,
   });
 }
@@ -304,6 +327,7 @@ async function start() {
   const saved = readJson(PRESETS_KEY, []);
   const presetList = (Array.isArray(saved) ? saved : []).filter((p) => p && parseSpaceId(p.id) === p.id);
   state = { ...state, presets: presetList, learned: loadLearned(), sort: prefs.sort || "busy",
+            myBands: loadBands(readJson(MYBANDS_KEY, [])),
             scanMin: prefs.scanMin || 5, sfx: prefs.sfx !== false, english: prefs.english !== false };
   $("scan-min").value = String(state.scanMin);
   wire();
@@ -324,9 +348,13 @@ async function tuneIn(prefs) {
   }
   const bands = status.data.stations;
   set({ bands, liveSearch: status.data.live_search, problems: [] });
-  await tuneBand(bands.includes(prefs.band) ? prefs.band : bands[0]);
+  const known = (b) => bands.includes(b) || Boolean(findBand(state.myBands, b));
+  const beam = readBeam(location.search, (b) => bands.includes(b));
+  await tuneBand(beam?.band || (known(prefs.band) ? prefs.band : bands[0]));
+  if (beam) landBeam(app, beam);
   preloadCrew();
-  setInterval(() => state.liveSearch && tuneBand(state.band, { refresh: true }), REFRESH_MS);
+  // Refresh only while someone can see the radio: a hidden tab never spends.
+  setInterval(() => state.liveSearch && !document.hidden && tuneBand(state.band, { refresh: true }), REFRESH_MS);
 }
 
 start();

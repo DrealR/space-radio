@@ -80,7 +80,7 @@ class BudgetReservationTests(TmpCase):
         self.assertIsNone(b.try_reserve(2))  # would pass the cap: nothing held
         self.assertAlmostEqual(b.ledger().spent, 0.04)
         b.settle(held, ["1", "2"])
-        self.assertEqual(b.ledger().paid_ids, frozenset({"1", "2"}))
+        self.assertEqual(b.ledger().paid_ids, frozenset({"0:1", "0:2"}))
         again = b.try_reserve(3)
         b.release(again)
         self.assertAlmostEqual(b.ledger().spent, 0.02)
@@ -179,11 +179,12 @@ class CrewSpaceLedgerTests(TmpCase):
             crew.scan(SID)
         self.assertEqual((caught.exception.reason, fake.urls), ("budget", []))
 
-    def test_a_room_the_dial_already_paid_for_still_scans(self):
+    def test_a_room_the_dial_already_saw_still_pays_its_probe(self):
+        # X bills the probe's Space read even if a search returned the room today.
         crew = self.make(FakeCrewX(crew_body()), space_cap=0.0)
         self.band.charge([SID])
-        self.assertEqual(crew.scan(SID)[0].mode, "full")
-        self.assertEqual(self.spaces.ledger().spent, 0)
+        with self.assertRaises(CrewError):
+            crew.scan(SID)
 
 
 class BandReservationTests(TmpCase):

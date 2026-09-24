@@ -1,9 +1,10 @@
 """A daily spending guard for the X API.
 
-X bills $0.005 per Space returned and $0.010 per user returned, and counts
-each id once per UTC day. A ledger remembers which ids were already paid for
-today, refuses a call whose worst case would pass the cap, and survives
-restarts in a small JSON file. Rooms and names keep separate ledgers, so
+X bills $0.005 per Space returned and $0.010 per user returned. Its docs promise
+each id is billed once per UTC day, but the first real day (Sep 24: 576 billed
+items from 51 requests, $2.92) showed it billing on nearly every request. So the
+ledger counts every id on every call, refuses a call whose worst case would pass
+the cap, and survives restarts in a small JSON file. Rooms and names keep separate ledgers, so
 looking up who's aboard can never starve the dial.
 
 A server answers several requests at once, so a check followed later by a
@@ -25,7 +26,7 @@ from typing import Optional
 
 PRICE_PER_SPACE = 0.005
 PRICE_PER_USER = 0.010          # every user in includes.users is billed
-DEFAULT_DAILY_CAP = 0.50        # dollars; ~100 distinct Spaces a day
+DEFAULT_DAILY_CAP = 1.00        # dollars; ~200 rooms returned a day (every request counts)
 DEFAULT_CREW_DAILY_CAP = 0.50   # dollars; ~50 new names a day (a full crew is ~9-15). Per instance on Vercel.
 DEFAULT_CREW_SPACE_CAP = 0.10   # dollars; ~20 rooms a day looked up by name, off the dial's ledger
 
@@ -78,7 +79,8 @@ class Budget:
     def charge(self, space_ids) -> Ledger:
         with self._lock:
             current = self.ledger()
-            return self._store(replace(current, paid_ids=current.paid_ids | frozenset(space_ids),
+            this_call = frozenset(f"{current.calls}:{i}" for i in space_ids)
+            return self._store(replace(current, paid_ids=current.paid_ids | this_call,
                                        calls=current.calls + 1))
 
     def try_reserve(self, count: int, tag: str = "") -> Optional[frozenset]:
@@ -93,10 +95,12 @@ class Budget:
             return keys
 
     def settle(self, held, billed) -> Ledger:
-        """Swap a reservation for the ids X actually billed."""
+        """Swap a reservation for what X actually billed: every id in this answer, even
+        ones already paid today (X doesn't reliably dedupe), so each call gets its own keys."""
         with self._lock:
             current = self.ledger()
-            paid = (current.paid_ids - frozenset(held)) | frozenset(billed)
+            this_call = frozenset(f"{current.calls}:{i}" for i in billed)
+            paid = (current.paid_ids - frozenset(held)) | this_call
             return self._store(replace(current, paid_ids=paid, calls=current.calls + 1))
 
     def release(self, held) -> Ledger:
