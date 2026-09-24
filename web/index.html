@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spaces Radio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="radio.css">
+</head>
+<body>
+  <main class="set">
+    <header class="top">
+      <div>
+        <h1>Spaces Radio</h1>
+        <p class="sub">Real people, live, talking about what they care about.</p>
+      </div>
+      <span id="mode" class="pill">…</span>
+    </header>
+
+    <nav id="dial" class="dial" aria-label="Stations"></nav>
+
+    <section class="now" aria-live="polite">
+      <div class="glow" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <p class="label" id="now-label">Tuning…</p>
+      <h2 id="now-title">Pick a station</h2>
+      <p class="meta" id="now-meta"></p>
+      <div class="controls">
+        <button id="listen" class="primary" type="button">Tune in</button>
+        <button id="next" type="button" title="Next room (→)">Next room →</button>
+        <button id="keep" type="button" title="Save this room">♡ Keep</button>
+      </div>
+      <div class="drift">
+        <label><input id="drift-on" type="checkbox"> Drift to the next room every</label>
+        <select id="drift-min" aria-label="Minutes per room">
+          <option value="2">2 min</option><option value="5" selected>5 min</option>
+          <option value="10">10 min</option><option value="20">20 min</option>
+        </select>
+        <span id="drift-clock" class="clock"></span>
+      </div>
+      <p class="hint" id="hint">Tune in opens the room in its own X window. Leave it open while you work; this page changes what it plays.</p>
+    </section>
+
+    <section class="rooms">
+      <h3>On this station <span id="count"></span></h3>
+      <ol id="queue" class="queue"></ol>
+      <p id="problems" class="problems" hidden></p>
+    </section>
+
+    <section class="add">
+      <h3>Found a room?</h3>
+      <p class="small">Paste a Space link from your phone's Spaces tab, a post, or a friend. It stays on your dial for free.</p>
+      <form id="add-form">
+        <input id="add-link" name="link" placeholder="https://x.com/i/spaces/…" required autocomplete="off">
+        <input id="add-title" name="title" placeholder="What's it about? (optional)" autocomplete="off">
+        <button type="submit">Add to my dial</button>
+      </form>
+      <p id="add-msg" class="small" role="status"></p>
+      <p class="small"><a id="hunt" target="_blank" rel="noopener">Look for rooms people are sharing on X right now ↗</a></p>
+    </section>
+
+    <footer class="foot" id="budget"></footer>
+  </main>
+  <script src="radio.js"></script>
+</body>
+</html>
