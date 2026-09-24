@@ -27,10 +27,10 @@ export function readBeam(search, hasBand) {
 }
 
 /** Phone: the share sheet. Computer: the clipboard. Returns what happened. */
-export async function sendBeam(url, title, { phone, nav = navigator } = {}) {
+export async function sendBeam(url, title, { phone, nav = navigator, text } = {}) {
   if (phone && nav.share) {
     try {
-      await nav.share({ title: "Space Radio", text: `Come hear "${title}" with me on Space Radio`, url });
+      await nav.share({ title: "Space Radio", text: text || `Come hear "${title}" with me on Space Radio`, url });
       return "shared";
     } catch (err) {
       if (err?.name === "AbortError") return "cancelled";

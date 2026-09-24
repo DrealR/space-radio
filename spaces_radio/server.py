@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .service import Reply, RadioService, envelope, service_from_env, write_reply
+from .service import Reply, RadioService, dock_post, envelope, service_from_env, write_reply
 
 PUBLIC = Path(__file__).resolve().parent.parent / "public"
 PORT = int(os.environ.get("SPACES_RADIO_PORT", "8740"))
@@ -44,6 +44,13 @@ def make_handler(service: RadioService):
             if url.path == "/api/crew":
                 return write_reply(self, service.crew_raw(url.query))
             self._static(url.path)
+
+        def do_POST(self):
+            if urlparse(self.path).path != "/api/dock":
+                return write_reply(self, Reply(404, envelope(error="Not found.")))
+            length = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(length) if 0 < length <= 4096 else b""
+            write_reply(self, dock_post(body))
 
         def _static(self, url_path: str):
             path = (PUBLIC / (url_path.lstrip("/") or "index.html")).resolve()

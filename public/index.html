@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="crew.css">
   <link rel="stylesheet" href="radar.css">
   <link rel="stylesheet" href="bands.css">
+  <link rel="stylesheet" href="tunnel.css">
 </head>
 <body>
   <!-- Glyphs the web fonts don't carry (and some phones draw as emoji). -->
@@ -100,6 +101,7 @@
             <div class="speaker-links">
               <a id="open-x" class="open-x" href="#" target="_blank" rel="noopener noreferrer" hidden>OPEN IN X <svg class="g" aria-hidden="true"><use href="#g-out"/></svg></a>
               <button type="button" id="beam" class="open-x beam" hidden title="Send a friend a link to this room">BEAM ✦</button>
+              <button type="button" id="dock-btn" class="open-x dock" aria-haspopup="dialog" title="Dock with a friend's radio">DOCK ⟷</button>
             </div>
           </div>
 
@@ -155,6 +157,8 @@
           <div id="airlock-in" class="airlock-in"></div>
         </section>
 
+        <section id="tunnel" class="tunnel" aria-live="polite" aria-label="Docking tunnel" hidden></section>
+
         <div class="dymo presets-label" aria-hidden="true">PRESETS</div>
         <div id="presets" class="presets"></div>
 
@@ -181,7 +185,17 @@
         <li><b>◎ RADAR</b> shows every ship on the band as a blip. Nearer the centre means a bigger crowd, and a green halo means voices on the mic. Tap a ship to tune to it.</li>
         <li><b>＋</b> at the end of the bands makes your own: a short name and up to two search words, like guitar or Detroit.</li>
         <li><b>BEAM ✦</b> sends a friend a link that opens their radio on the room you're on, so you can hang out in the same Space.</li>
+        <li><b>DOCK ⟷</b> links your radio with one friend's through a tunnel. See below.</li>
       </ol>
+
+      <h2>Docking</h2>
+      <p>Rocky and Grace couldn't breathe the same air, so they met at a clear wall and spoke in chords. Docking works the same way. Your two radios link through a tunnel, and each of you keeps your own dial and your own X.</p>
+      <ul class="facts">
+        <li><b>DOCK ⟷</b> opens a port with a code like ERID-42. Send its link to one friend. When their radio opens it, the ships clamp together.</li>
+        <li>Your partner's ship shows on your <b>◎ RADAR</b> in violet.</li>
+        <li>Speak in tones: <b>✊ FIST MY BUMP</b> (hello), <b>✦ AMAZE ×3</b> (this one's good), <b>↑ COME HERE</b> (brings them to your room), <b>↓ ONWARD</b> (moving on).</li>
+        <li>The real talking happens inside the Space. The tunnel only helps you find it together. Either of you can undock anytime, and nothing is kept.</li>
+      </ul>
 
       <h2>Why two buttons?</h2>
       <p>Browsers only let a site make sound after you press something on that site. The radio finds the ship; X opens the hatch. So every room takes two presses: <b>PUSH</b> here, then <b><svg class="g" aria-hidden="true"><use href="#g-play"/></svg> Start listening</b> in X. The dial browses, the button boards.</p>

@@ -23,13 +23,15 @@ export const byCrowd = (rooms) => [...rooms].sort((a, b) => count(b.listeners) -
 /** Words for a blip: what a screen reader says and what the readout shows. */
 export function blipLabel(room) {
   const title = room.title || "Untitled room";
-  if (typeof room.listeners !== "number") return `${title} · ${room.beamed ? "beamed in" : "your preset"}`;
+  const partner = room.partner ? " · your partner is here" : "";
+  if (typeof room.listeners !== "number") return `${title} · ${room.beamed ? "beamed in" : room.partner ? "your partner's ship" : "your preset"}${partner && !room.partner ? partner : ""}`;
   const mic = count(room.speakers) ? ` · ${room.speakers} on the mic` : "";
-  return `${title} · ${room.listeners} aboard${mic}`;
+  return `${title} · ${room.listeners} aboard${mic}${partner}`;
 }
 
-/** One frozen blip per room, in the order given (the caller decides tab order). */
-export function blipLayout(rooms, currentId) {
+/** One frozen blip per room, in the order given (the caller decides tab order).
+ *  partnerId: the room your docked partner is on, drawn as a second ship. */
+export function blipLayout(rooms, currentId, partnerId = null) {
   const max = Math.max(1, ...rooms.map((r) => count(r.listeners)));
   // Distance blends crowd size with crowd rank, so similar-sized rooms still spread into rings.
   const ranked = byCrowd(rooms.filter((r) => typeof r.listeners === "number")).map((r) => r.id);
@@ -50,7 +52,8 @@ export function blipLayout(rooms, currentId) {
       kind: known ? "live" : "mine",
       mic: count(room.speakers) > 0,
       current: room.id === currentId,
-      label: blipLabel(room),
+      partner: room.id === partnerId,
+      label: blipLabel({ ...room, partner: room.id === partnerId }),
     });
   });
 }

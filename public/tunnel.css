@@ -1,0 +1,69 @@
+/* The docking tunnel between two radios: the port card, the tunnel strip with its xenonite wall, and the partner on the radar. */
+.open-x.dock { border: 0; cursor: pointer; background: #20193a; color: #e5d9ff; transform: rotate(-1deg); }
+.open-x.dock.on { background: #3b1f63; color: #fff; box-shadow: 0 0 0 2px #b88cff, 0 0 14px rgba(184, 140, 255, .6); }
+
+/* The tunnel strip: two ship cards with the wall between them. */
+.tunnel { margin-top: 16px; padding: 12px 12px 10px; border-radius: 14px; color: #efe7ff; font-family: var(--mono);
+  background: linear-gradient(160deg, #1d1633, #120e22); box-shadow: inset 0 0 0 1px rgba(184, 140, 255, .35), 0 1px 0 rgba(255,255,255,.5); }
+.tunnel.rx { animation: tn-rx 1.2s ease-out; }
+.tunnel.clamped { animation: tn-clamp .9s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes tn-rx { 0% { box-shadow: inset 0 0 0 2px #7dff9a, 0 0 24px rgba(125, 255, 154, .6); } }
+@keyframes tn-clamp { 0% { transform: scaleX(.94); } 60% { transform: scaleX(1.02); } }
+.tn-head { display: flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: .16em; }
+.tn-code { font-weight: 700; }
+.tn-status { flex: 1; opacity: .75; text-align: right; }
+.tn-x { border: 0; background: transparent; color: #cdb8ff; font: 700 10px var(--mono); letter-spacing: .12em; cursor: pointer; min-height: 32px; }
+.tn-ships { display: grid; grid-template-columns: 1fr 22px 1fr; gap: 8px; align-items: stretch; margin: 10px 0; }
+.tn-ship { min-width: 0; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, .05); display: grid; gap: 2px; }
+.tn-ship small { font-size: 9px; letter-spacing: .22em; opacity: .6; }
+.tn-ship b { font: 20px/1.1 var(--lcd); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+.tn-ship span { font-size: 10px; letter-spacing: .08em; opacity: .8; }
+.tn-ship.them { text-align: right; }
+[data-status="waiting"] .tn-ship.them b, [data-status="lost"] .tn-ship.them b { opacity: .4; }
+/* Xenonite: a clear hexagonal wall. Contact without collapse. */
+.tn-wall { position: relative; border-radius: 6px; overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0, rgba(255,255,255,.35), transparent 60%),
+    repeating-linear-gradient(60deg, rgba(190, 255, 235, .22) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(-60deg, rgba(190, 255, 235, .22) 0 1px, transparent 1px 7px),
+    linear-gradient(#8ff5d4, #3fb8a0);
+  box-shadow: 0 0 12px rgba(143, 245, 212, .5); opacity: .55; }
+[data-status="docked"] .tn-wall { opacity: 1; }
+.tn-wall i { position: absolute; inset: -40% 0; background: linear-gradient(transparent, rgba(255,255,255,.7), transparent);
+  animation: tn-shimmer 2.8s ease-in-out infinite; }
+@keyframes tn-shimmer { from { transform: translateY(-60%); } to { transform: translateY(60%); } }
+.tn-tones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tn-tone { min-height: 40px; border: 0; border-radius: 9px; cursor: pointer; padding: 4px 2px; font: 700 9px/1.2 var(--mono); letter-spacing: .06em;
+  color: #1a1030; background: linear-gradient(#f2eaff, #cdb8ff); box-shadow: 0 4px 0 #7d5fc0; transition: transform .06s, box-shadow .06s; }
+.tn-tone:active { transform: translateY(3px); box-shadow: 0 1px 0 #7d5fc0; }
+.tn-tone:disabled { opacity: .35; cursor: default; }
+.tn-go { width: 100%; margin-top: 8px; min-height: 36px; border: 0; border-radius: 9px; cursor: pointer; font: 700 11px var(--mono); letter-spacing: .1em;
+  background: #7dff9a; color: #062a14; box-shadow: 0 0 14px rgba(125, 255, 154, .5); }
+
+/* The docking port card. */
+.dockport { border: 0; padding: 0; background: transparent; max-width: calc(100vw - 24px); }
+.dockport::backdrop { background: rgba(8, 4, 16, .75); backdrop-filter: blur(4px); }
+.dp-card { width: min(400px, calc(100vw - 24px)); padding: 22px; border-radius: 18px; text-align: center; color: #efe7ff; font-family: var(--mono);
+  background: radial-gradient(120% 80% at 50% 0%, #2a1f4a, #120e22); box-shadow: inset 0 0 0 1px rgba(184, 140, 255, .35), 0 30px 60px rgba(0,0,0,.6); }
+.dp-kicker { margin: 0; font: 700 11px var(--mono); letter-spacing: .3em; text-transform: uppercase; color: #b88cff; }
+.dp-rings { position: relative; width: 110px; height: 110px; margin: 14px auto 6px; }
+.dp-rings i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(184, 140, 255, .6); animation: dp-ring 2.4s ease-out infinite; }
+.dp-rings i:nth-child(2) { animation-delay: .8s; } .dp-rings i:nth-child(3) { animation-delay: 1.6s; }
+@keyframes dp-ring { from { transform: scale(.2); opacity: 1; } to { transform: scale(1); opacity: 0; } }
+[data-status="docked"] .dp-rings i { border-color: #7dff9a; animation-duration: 1.2s; }
+.dp-code { margin: 0; font: 40px/1 Bungee, var(--mono); letter-spacing: .04em; color: #fff; text-shadow: 0 0 18px rgba(184, 140, 255, .8); user-select: all; }
+.dp-status { margin: 8px 0 12px; font: 22px var(--lcd); color: #b8ffd9; }
+.dp-lede { font-size: 12px; line-height: 1.6; opacity: .85; margin: 0 0 14px; text-align: left; }
+.dp-send, .dp-close { width: 100%; min-height: 44px; border-radius: 10px; cursor: pointer; font: 700 12px var(--mono); letter-spacing: .12em; }
+.dp-send { border: 0; background: linear-gradient(#caa8ff, #8d5fe0); color: #16082c; }
+.dp-close { margin-top: 10px; background: transparent; color: #cdb8ff; border: 1px solid rgba(184, 140, 255, .5); }
+.dp-note { min-height: 1.3em; margin: 8px 0 0; font-size: 12px; color: #b8ffd9; }
+
+/* Your partner's ship on the radar: violet, with a slow docking ring. */
+.blip.partner::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px dashed #caa8ff;
+  animation: sweep 6s linear infinite; }
+.blip.partner .blip-core { background: #caa8ff; box-shadow: 0 0 14px rgba(202, 168, 255, .9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tunnel, .tn-wall i, .dp-rings i, .blip.partner::before { animation: none; }
+}

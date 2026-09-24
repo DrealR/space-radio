@@ -24,6 +24,8 @@ import { openRadar } from "./js/radar.js";
 import { bandKey, findBand, isMine, loadBands, mergeRooms, searchPath } from "./js/mybands.js";
 import { readBeam } from "./js/beam.js";
 import { beamCurrent, landBeam, makeBand, MYBANDS_KEY } from "./js/bridge.js";
+import { createDock } from "./js/tunnel.js";
+import { readDock } from "./js/dock-model.js";
 
 const HUNT_URL = "https://x.com/search?q=%22x.com%2Fi%2Fspaces%22&f=live";
 const PREFS_KEY = "spaces-radio:prefs";
@@ -226,6 +228,7 @@ function render() {
   renderLaunch(copy, { air: state.air, room, learned: state.learned, title: state.airTitle,
                        onChip: (id, e) => launch.chip(id, e) });
   renderControls();
+  tunnel.draw(); // shows your current room (the tunnel exists before start() first renders)
 }
 
 // The modules below see the app through this one door.
@@ -237,7 +240,9 @@ const app = {
 };
 const launch = createLaunch(app);
 const openCrew = () => showCrew(app, launch);
-const showRadar = () => openRadar({ rooms: deck(), currentId: current()?.id, band: state.band }, (id) => select(id));
+const tunnel = createDock(app);
+const showRadar = () => openRadar({ rooms: deck(), currentId: current()?.id, band: state.band, partner: tunnel.partnerRoom() },
+  (id) => select(id));
 
 // ---- wiring -------------------------------------------------------------------------------
 function showManual() {
@@ -263,6 +268,7 @@ function wireLaunch() {
   $("speaker").addEventListener("click", openCrew);
   $("radar-btn").addEventListener("click", showRadar);
   $("beam").addEventListener("click", () => beamCurrent(app));
+  $("dock-btn").addEventListener("click", () => tunnel.open());
   $("open-x").addEventListener("click", launch.openXClick);
   $("open-x").title = "The room on X: everyone aboard. To listen with the radio, use PUSH.";
   if (phone) $("open-x").removeAttribute("target");
@@ -352,6 +358,14 @@ async function tuneIn(prefs) {
   const beam = readBeam(location.search, (b) => bands.includes(b));
   await tuneBand(beam?.band || (known(prefs.band) ? prefs.band : bands[0]));
   if (beam) landBeam(app, beam);
+  // A docking link opens the tunnel; otherwise a reload picks up this tab's dock, if any.
+  const dockToken = readDock(location.search);
+  if (dockToken) {
+    history.replaceState(null, "", location.pathname);
+    tunnel.join(dockToken);
+  } else {
+    tunnel.restore();
+  }
   preloadCrew();
   // Refresh only while someone can see the radio: a hidden tab never spends.
   setInterval(() => state.liveSearch && !document.hidden && tuneBand(state.band, { refresh: true }), REFRESH_MS);

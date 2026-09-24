@@ -110,3 +110,19 @@ export function holo(name) {
     }
   });
 }
+
+/** Rocky speaks in chords: a quick arpeggio for each docking tone (notes in Hz). */
+export function chord(notes) {
+  play("chord", (ac) => notes.forEach((hz, i) => {
+    tone(ac, { hz, at: i * 0.09, len: 0.26, gain: 0.04 });
+    tone(ac, { type: "triangle", hz: hz * 2, at: i * 0.09 + 0.01, len: 0.12, gain: 0.012 });
+  }));
+}
+
+/** The docking clamp: an airlock hiss and a low thunk as two ships connect. */
+export function clamp() {
+  play("clamp", (ac) => {
+    noise(ac, { len: 0.35, hz: 900, q: 0.6, gain: 0.035, attack: 0.02 });
+    tone(ac, { hz: 110, to: 70, at: 0.3, len: 0.18, gain: 0.05 });
+  });
+}

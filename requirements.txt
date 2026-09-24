@@ -1,0 +1,2 @@
+# Only the dock needs this: Vercel Runtime Cache, the shared relay between two docked radios.
+vercel-cache==0.7.5

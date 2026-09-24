@@ -19,6 +19,7 @@ import math
 import os
 import re
 import sys
+import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,6 +33,7 @@ from .sources import SourceError, SpaceSource, XApiSource, _http_get_json
 from .stations import STATIONS, tune
 from .ticket import Tickets, ticket_key
 from .words import word_from_raw
+from . import dock as docking
 
 FRESH_SECONDS = 1800    # a good answer is shared for 30 minutes (each fresh search is billed)
 TROUBLE_SECONDS = 60    # a partial or failed answer is retried sooner
@@ -155,6 +157,37 @@ class RadioService:
         seconds = LIVE_SECONDS if scan.state == "live" else SETTLED_SECONDS
         meta = {"fetched_at": scan.fetched_at, "mode": scan.mode, "cached": cached}
         return Reply(200, envelope(scan.to_json(), meta=meta), seconds)
+
+
+_local_docks = docking.MemoryStore()
+
+
+def dock_store(env=os.environ):
+    """Vercel: the Runtime Cache, strictly (a silent in-memory fallback would split one dock across
+    instances). Anywhere else: this process's memory. None means the relay is down."""
+    if not env.get("VERCEL"):
+        return _local_docks
+    try:
+        from vercel.cache.runtime_cache import resolve_cache
+        return resolve_cache(sync=True, strict=True)
+    except Exception as err:  # ImportError, RuntimeCacheError
+        print(f"[spaces-radio] dock relay unavailable: {type(err).__name__}: {err}", file=sys.stderr)
+        return None
+
+
+def dock_post(body: bytes, store=None, now=None) -> Reply:
+    """POST /api/dock: one beat from a docked radio. Never cached, never touches X."""
+    try:
+        beat = docking.parse_beat(body)
+        live = store if store is not None else dock_store()
+        if live is None:
+            return Reply(503, envelope(error="The docking relay is offline. Try again soon."))
+        return Reply(200, envelope(docking.beat(live, beat, now if now is not None else time.time())))
+    except docking.DockError as err:
+        return Reply(err.status, envelope(error=str(err)))
+    except Exception as err:  # the cache said no: report it, don't crash the function
+        print(f"[spaces-radio] dock beat failed: {type(err).__name__}: {err}", file=sys.stderr)
+        return Reply(503, envelope(error="The docking relay didn't answer. Trying again."))
 
 
 def crew_error(reason: str) -> Reply:

@@ -32,7 +32,7 @@ function shell(onClose) {
 }
 
 function blipButton(blip, pick) {
-  const b = el("button", { type: "button", className: `blip ${blip.kind}${blip.mic ? " mic" : ""}${blip.current ? " current" : ""}` },
+  const b = el("button", { type: "button", className: `blip ${blip.kind}${blip.mic ? " mic" : ""}${blip.current ? " current" : ""}${blip.partner ? " partner" : ""}` },
     el("span", { className: "blip-core" }));
   b.setAttribute("aria-label", blip.current ? `${blip.label} (tuned now)` : blip.label);
   b.style.cssText = `left:${blip.x}%;top:${blip.y}%;--s:${blip.size}px;--d:${blip.delay}s`;
@@ -44,16 +44,19 @@ function blipButton(blip, pick) {
 }
 
 /** Opens the scope for the rooms the dial holds now. pick(id) tunes the radio. */
-export function openRadar({ rooms, currentId, band }, pick) {
+export function openRadar({ rooms, currentId, band, partner = null }, pick) {
   if (!dialog) dialog = shell(() => { returnTo?.focus?.(); returnTo = null; });
   returnTo = document.activeElement;
-  const ships = byCrowd(rooms);
+  // A docked partner on a room this band doesn't show still gets a ship on the scope.
+  const withPartner = partner && !rooms.some((r) => r.id === partner.id)
+    ? [...rooms, { ...partner, listeners: partner.listeners ?? null }] : rooms;
+  const ships = byCrowd(withPartner);
   const choose = (id) => { dialog.close(); pick(id); };
   document.getElementById("radar-kicker").textContent = `BRIDGE SCOPE · ${bandLabel(band)} BAND`;
   document.getElementById("radar-title").textContent =
     ships.length ? `${ships.length} ${ships.length === 1 ? "ship" : "ships"} in range` : "No ships in range";
   document.getElementById("radar-readout").textContent = ships.length ? HINT : "Try another band, or come back tonight.";
-  document.getElementById("radar-blips").replaceChildren(...blipLayout(ships, currentId).map((b) => blipButton(b, choose)));
+  document.getElementById("radar-blips").replaceChildren(...blipLayout(ships, currentId, partner?.id).map((b) => blipButton(b, choose)));
   dialog.showModal();
   const here = dialog.querySelector(".blip.current") || dialog.querySelector(".blip") || dialog.querySelector(".radar-x");
   here.focus();
