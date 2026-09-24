@@ -72,6 +72,21 @@ exercise the "ended" and "busy" crew states. It is ignored on Vercel.
 - `api/crew.py` serves the crew manifest (`/api/crew?id=<space id>`, plus the room's `&t=<ticket>`), with the
   same one-spelling rule.
 
+## Docking (two radios, one tunnel)
+
+Rocky and Grace in *Project Hail Mary* couldn't breathe the same air, so they met at a clear xenonite
+wall and spoke in chords. **DOCK ⟷** does that for two radios:
+
+- One radio opens a port (a Hail Mary star code like `ERID-42`, plus a secret) and sends the link.
+  The friend's radio clamps on. Each keeps its own dial and its own X.
+- The tunnel strip shows both ships across the wall, and the partner's ship appears violet on the radar.
+- Four tones play as chords: **✊ FIST MY BUMP**, **✦ AMAZE ×3**, **↑ COME HERE** (carries your room;
+  they get GO TO YOUR ROOM), **↓ ONWARD**. There's no chat box: the talking happens inside the Space.
+- Relay: `POST /api/dock`, one slot per ship (`dock-<code>-a|b`). Each beat writes yours and reads theirs.
+  On Vercel it's the **Runtime Cache** (strict: a 503 if it's missing, never a silent per-instance
+  fallback); locally it's memory. A third radio gets DOCK FULL; UNDOCK frees the slot; idle slots
+  expire after 30 minutes. Nothing touches X, so docking has no X cost.
+
 ## What it costs
 
 X's API is pay-per-use: **$0.005 per room returned**. The docs say each room is billed once per UTC day,
