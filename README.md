@@ -1,54 +1,60 @@
-# Spaces Radio
+# Spaces Radio SR-26
 
-A radio dial for live X Spaces: rooms full of real people talking about what they care about.
-Pick a station, tune in, work while it plays in the background, and let it drift to the next
-room every few minutes. Speak in a room only if you feel like it.
+A walkie-talkie radio for live X Spaces. Each channel is a room of real people talking right now.
+Flip through rooms like a feed, listen while you work, and grab the mic if you want to.
+Built Sep 23, 2026 for winter nights, when the park is too cold.
 
-Built Sep 23, 2026 for winter: when the park is too cold, a way to still be around people.
+- **BAND** keys choose the topic. The **glass** shows every live room on that band: taller means busier.
+- **TUNE** knob, swipe or ← → flips rooms, with static in between.
+- **Speaker grille**: one dot per person. Amber dots are hosts, green dots are on the mic, cream dots are listening.
+- **PUSH TO JOIN** opens the room in X (the X app on a phone), where you can listen or request the mic.
+- **SCAN** (computer only) hops to a new room every few minutes and steers the same X window.
+- **Presets** save rooms. They live in each person's own browser.
 
-## Run it
+## Run it locally
 
 ```bash
 cd ~/Morrow/showcase/spaces-radio && python3 -m spaces_radio.server
 ```
 
-Open http://127.0.0.1:8740. Without an X key it runs in **saved-rooms mode**, which is free:
-paste a Space link you found (on the phone's Spaces tab, in a post, from a friend) and it goes on
-your dial. "Look for rooms people are sharing on X" opens an X search for posts with Space links.
+Open http://127.0.0.1:8740. Add `X_BEARER_TOKEN` to the environment for live search (see below).
 
-## Let it find live rooms itself (costs money, capped)
+## Hosting (Vercel)
 
-X's web site can't search Spaces, but the X API can (`GET /2/spaces/search?state=live`).
-The API is pay-per-use: **$0.005 per room returned**, and each room is charged only once per UTC day.
+- `public/` is the static site. `api/tune.py` and `api/status.py` are Python functions that call `spaces_radio/`.
+- The X key lives only in the Vercel environment (`X_BEARER_TOKEN`). Listeners never need a key.
+- **One key, many listeners.** `/api/tune` answers carry `Vercel-CDN-Cache-Control: max-age=600`,
+  so everyone on the same band in the same 10 minutes shares one answer, and X is asked once.
+  Any extra query parameter is refused, so nobody can bypass that cache and run up the bill.
+- Add the key: `vercel env add X_BEARER_TOKEN production`, paste the token, then redeploy.
 
-1. In the X Developer Console (https://developer.x.com) create an app, buy a small amount of credit, and copy its **Bearer Token**.
-2. `python3 ~/Morrow/tools/mo_keys.py add X_BEARER_TOKEN --service X --url https://developer.x.com --used-by spaces-radio`
-3. Start with the key:
-   ```bash
-   cd ~/Morrow/showcase/spaces-radio && python3 ~/Morrow/tools/mo_keys.py run --project spaces-radio -- python3 -m spaces_radio.server
-   ```
+## What it costs
 
-The server stops itself at **$0.50 a day** (about 100 distinct rooms). Change it with
-`SPACES_RADIO_DAILY_CAP=1.00`. Searches are cached for 10 minutes. Each station runs 1 to 3 searches
-of up to 20 rooms, so a first tune costs at most 10 to 30 cents and later tunes that day cost less.
-The spend shows at the bottom of the page. Ticketed (paid) Spaces are skipped.
+X's API is pay-per-use: **$0.005 per room returned**, and a room is charged once per UTC day
+no matter how often it's seen. So cost follows *how many distinct rooms show up*, not how many people listen.
+
+- Every search asks for up to 10 rooms, and each band runs 1 to 3 searches.
+- If one person listens a few hours a day, expect roughly $0.50 to $2 a day. This is a guess; measure the first week.
+- **The hard cap lives at X.** In the X Developer Console, set a spending limit per billing cycle (for example $10)
+  and leave auto-recharge off. When the limit is hit, X blocks calls and the radio shows "signal trouble".
+- The server also keeps a soft daily guard (`SPACES_RADIO_DAILY_CAP`, default $0.50), but on Vercel
+  each instance keeps its own, so don't rely on it as the cap.
 
 ## How it's built (Head First, chapter 1: Strategy)
 
-- `spaces_radio/sources.py`: the dial asks a `SpaceSource` for rooms without caring where they came
-  from. `XApiSource` (paid, behind a `Budget`) and `SavedSource` (free) today. Clubhouse or Telegram
-  voice chats would be one new class each.
-- `budget.py`: the daily spend ledger. If the ledger file is damaged it assumes the day is spent
-  (fails closed) rather than reset to zero.
-- `stations.py`: station → search words. Edit these to change the dial.
-- `server.py`: stdlib HTTP on 127.0.0.1 only, JSON replies `{success, data, error, meta}`.
-- `web/`: the dial. It opens rooms in one named window and steers that same window for Next and Drift.
-- Tests: `python3 -m unittest discover -s tests -t .` (21 tests, no network).
+- `spaces_radio/sources.py`: the radio asks a `SpaceSource` for rooms and doesn't care where they
+  come from. `XApiSource` today. A shared community list, Clubhouse or Telegram voice chats would be
+  one new class each.
+- `service.py`: what the radio answers (and how long it may be cached), shared by the local server and Vercel.
+- `stations.py`: band → search words. Edit these to change the dial.
+- `public/js/rooms.js`: pure helpers (sorting, the FM dial, the crowd in the grille, presets).
+  `sfx.js`: static and roger beep made with Web Audio. `app.js`: state and drawing.
 
-## Limits, honestly
+Tests (no network): `python3 -m unittest discover -s tests -t .` and `node --test tests/*.mjs`.
 
-- Audio plays on x.com, not in this page: X has no public audio stream for Spaces. You need to be
-  signed in to X in that browser, and X may ask you to click "Start listening" on each new room.
-- Saved rooms don't know whether they're still live until you tune in.
-- It runs on the Mac. A phone version (swipe to the next room) is a later step.
-- The live-search path is tested against a fake X API only; it hasn't made a real paid call yet.
+## Limits
+
+- Audio plays in X, not in this page, because X offers no public audio stream for Spaces.
+  On a computer you need to be signed in to X, and X may ask you to click "Start listening".
+- Presets don't know whether a room is still live until you join it.
+- The live X path is tested against a fake API only until a real key is added.

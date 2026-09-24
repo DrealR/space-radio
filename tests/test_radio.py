@@ -9,8 +9,9 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from spaces_radio.budget import PRICE_PER_SPACE, Budget
-from spaces_radio.server import Radio, make_handler
-from spaces_radio.sources import SavedSource, SourceError, XApiSource, gather
+from spaces_radio.server import make_handler
+from spaces_radio.service import FRESH_SECONDS, TROUBLE_SECONDS, RadioService, service_from_env
+from spaces_radio.sources import SourceError, XApiSource, gather
 from spaces_radio.space import Space, parse_space_id
 from spaces_radio.stations import STATIONS, tune
 
@@ -139,49 +140,79 @@ class XApiTests(TmpCase):
             XApiSource("", Budget(self.dir / "b.json"))
 
 
-class SavedTests(TmpCase):
-    def test_add_dedupes_and_remove(self):
-        saved = SavedSource(self.dir / "s.json")
-        saved.add(f"https://x.com/i/spaces/{ID_A}", "Late night guitar")
-        saved.add(ID_A, "Renamed")
-        self.assertEqual([(r.id, r.title) for r in saved.all()], [(ID_A, "Renamed")])
-        self.assertTrue(saved.remove(ID_A))
-        self.assertFalse(saved.remove(ID_A))
-
-    def test_bad_link_rejected(self):
-        with self.assertRaises(ValueError):
-            SavedSource(self.dir / "s.json").add("https://x.com/home")
-
-
 class GatherTests(TmpCase):
     def test_one_failing_source_does_not_silence_others(self):
-        saved = SavedSource(self.dir / "s.json")
-        saved.add(ID_C, "Mine")
-        src = XApiSource("tok", Budget(self.dir / "b.json"), fetch=FakeX(error=TimeoutError("slow")))
-        rooms, problems = gather([src, saved], "music")
+        good = XApiSource("tok", Budget(self.dir / "a.json"), fetch=FakeX([x_item(ID_C)]))
+        bad = XApiSource("tok", Budget(self.dir / "b.json"), fetch=FakeX(error=TimeoutError("slow")))
+        rooms, problems = gather([bad, good], "music")
         self.assertEqual([r.id for r in rooms], [ID_C])
         self.assertEqual(len(problems), 1)
 
-    def test_station_merges_words_live_first_busiest_first(self):
+    def test_station_merges_words_busiest_first(self):
         fake = FakeX([x_item(ID_A, listeners=5), x_item(ID_B, listeners=90)])
-        saved = SavedSource(self.dir / "s.json")
-        saved.add(ID_C, "Mine", topic="faith")
         src = XApiSource("tok", Budget(self.dir / "b.json"), fetch=fake)
-        rooms, _ = tune("music", [src, saved])
-        self.assertEqual([r.id for r in rooms], [ID_B, ID_A, ID_C])
+        rooms, _ = tune("music", [src])
+        self.assertEqual([r.id for r in rooms], [ID_B, ID_A])
         self.assertEqual(len(fake.urls), len(STATIONS["music"]))
-        self.assertEqual([r.topic for r in rooms], ["music", "music", "faith"])
+        self.assertEqual({r.topic for r in rooms}, {"music"})
+
+    def test_counts_hosts_and_speakers_without_user_lookups(self):
+        fake = FakeX([x_item(ID_A, host_ids=["1"], speaker_ids=["2", "3"])])
+        src = XApiSource("tok", Budget(self.dir / "b.json"), fetch=fake)
+        room = src.live("music")[0]
+        self.assertEqual((room.hosts, room.speakers), (1, 2))
+        self.assertIn("speaker_ids", fake.urls[0])
+        self.assertNotIn("expansions", fake.urls[0])
 
     def test_unknown_station(self):
         with self.assertRaises(KeyError):
             tune("nope", [])
 
 
+class ServiceTests(TmpCase):
+    def make(self, fake=None):
+        budget = Budget(self.dir / "b.json")
+        source = XApiSource("tok", budget, fetch=fake) if fake else None
+        return RadioService(source, budget)
+
+    def test_no_key_answers_empty_and_says_so(self):
+        svc = self.make()
+        self.assertFalse(svc.status().body["data"]["live_search"])
+        reply = svc.tune({"station": ["music"]})
+        self.assertEqual((reply.status, reply.body["data"]), (200, []))
+
+    def test_good_answer_is_shared_for_ten_minutes(self):
+        reply = self.make(FakeX([x_item(ID_A)])).tune({"station": ["music"]})
+        self.assertEqual(reply.status, 200)
+        self.assertEqual(reply.cdn_seconds, FRESH_SECONDS)
+        self.assertEqual(reply.body["data"][0]["url"], f"https://x.com/i/spaces/{ID_A}")
+
+    def test_trouble_is_cached_briefly(self):
+        reply = self.make(FakeX(error=TimeoutError("slow"))).tune({"station": ["music"]})
+        self.assertEqual(reply.cdn_seconds, TROUBLE_SECONDS)
+        self.assertTrue(reply.body["meta"]["problems"])
+
+    def test_extra_params_are_refused_so_cache_cannot_be_split(self):
+        fake = FakeX([x_item(ID_A)])
+        reply = self.make(fake).tune({"station": ["music"], "bust": ["123"]})
+        self.assertEqual((reply.status, reply.cdn_seconds), (400, 0))
+        self.assertEqual(fake.urls, [])
+
+    def test_unknown_station_refused(self):
+        self.assertEqual(self.make().tune({"station": ["hack"]}).status, 400)
+
+    def test_env_wiring(self):
+        env = {"SPACES_RADIO_DATA": str(self.dir), "X_BEARER_TOKEN": " tok "}
+        self.assertTrue(service_from_env(env).live_search)
+        self.assertFalse(service_from_env({"SPACES_RADIO_DATA": str(self.dir)}).live_search)
+
+
 class ServerTests(TmpCase):
     def setUp(self):
         super().setUp()
-        self.radio = Radio(self.dir)
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.radio))
+        service = RadioService(XApiSource("tok", Budget(self.dir / "b.json"),
+                                          fetch=FakeX([x_item(ID_A, "Hi")])), Budget(self.dir / "b.json"))
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(service))
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
 
@@ -190,40 +221,56 @@ class ServerTests(TmpCase):
         self.server.server_close()
         super().tearDown()
 
-    def call(self, path, method="GET", body=None):
-        data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(self.base + path, data=data, method=method,
-                                     headers={"Content-Type": "application/json"})
+    def get(self, path):
         try:
-            with urllib.request.urlopen(req) as r:
-                return r.status, json.loads(r.read())
+            with urllib.request.urlopen(self.base + path) as r:
+                return r.status, r.headers, r.read()
         except urllib.error.HTTPError as e:
-            return e.code, json.loads(e.read())
+            return e.code, e.headers, e.read()
 
-    def test_status_without_key_is_free_mode(self):
-        code, body = self.call("/api/status")
+    def test_tune_sets_cdn_cache(self):
+        code, headers, body = self.get("/api/tune?station=laughs")
         self.assertEqual(code, 200)
-        self.assertFalse(body["data"]["live_search"])
-        self.assertIn("music", body["data"]["stations"])
+        self.assertEqual(json.loads(body)["data"][0]["id"], ID_A)
+        self.assertIn(f"max-age={FRESH_SECONDS}", headers["Vercel-CDN-Cache-Control"])
 
-    def test_save_tune_remove_roundtrip(self):
-        code, body = self.call("/api/saved", "POST", {"link": f"https://x.com/i/spaces/{ID_A}", "title": "Hi"})
-        self.assertEqual((code, body["data"]["id"]), (201, ID_A))
-        code, body = self.call("/api/tune?station=laughs")
-        self.assertEqual([r["id"] for r in body["data"]], [ID_A])
-        self.assertEqual(self.call(f"/api/saved/{ID_A}", "DELETE")[0], 200)
-        self.assertEqual(self.call(f"/api/saved/{ID_A}", "DELETE")[0], 404)
-
-    def test_bad_inputs(self):
-        self.assertEqual(self.call("/api/tune?station=hack")[0], 400)
-        code, body = self.call("/api/saved", "POST", {"link": "nope"})
+    def test_errors_are_not_cached(self):
+        code, headers, _ = self.get("/api/tune?station=hack")
         self.assertEqual(code, 400)
-        self.assertFalse(body["success"])
-        self.assertEqual(self.call("/api/saved", "POST", ["list"])[0], 400)
+        self.assertEqual(headers["Cache-Control"], "no-store")
 
-    def test_serves_page(self):
-        with urllib.request.urlopen(self.base + "/") as r:
-            self.assertIn(b"Spaces Radio", r.read())
+    def test_serves_page_and_modules_but_not_outside_public(self):
+        self.assertIn(b"SPACES", self.get("/")[2])
+        self.assertEqual(self.get("/js/rooms.js")[0], 200)
+        self.assertEqual(self.get("/../spaces_radio/service.py")[0], 404)
+        self.assertEqual(self.get("/%2e%2e/README.md")[0], 404)
+
+
+class VercelHandlerTests(TmpCase):
+    """Load api/*.py the way Vercel does and serve them."""
+
+    def serve(self, name):
+        import importlib.util
+        import os
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(f"api_{name}", root / "api" / f"{name}.py")
+        module = importlib.util.module_from_spec(spec)
+        os.environ["SPACES_RADIO_DATA"] = str(self.dir)
+        os.environ.pop("X_BEARER_TOKEN", None)
+        import spaces_radio.service as service
+        service._shared = None
+        spec.loader.exec_module(module)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), module.handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        return f"http://127.0.0.1:{server.server_address[1]}"
+
+    def test_status_and_tune_functions(self):
+        with urllib.request.urlopen(self.serve("status") + "/api/status") as r:
+            self.assertIn("music", json.loads(r.read())["data"]["stations"])
+        with urllib.request.urlopen(self.serve("tune") + "/api/tune?station=music") as r:
+            self.assertEqual(json.loads(r.read())["data"], [])
 
 
 if __name__ == "__main__":

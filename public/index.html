@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Spaces Radio</title>
+  <meta name="description" content="A walkie-talkie radio for live X Spaces. Flip through rooms of real people talking right now; listen in or grab the mic.">
+  <meta property="og:title" content="Spaces Radio SR-26">
+  <meta property="og:description" content="Flip through live conversations. Real voices, right now.">
+  <meta name="theme-color" content="#1a120d">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Mono:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <main class="desk">
+    <div class="radio" id="radio">
+      <div class="antenna" aria-hidden="true"><i></i></div>
+
+      <div class="shell">
+        <header class="head">
+          <div class="logo">SPACES<b>RADIO</b></div>
+          <div class="model">SR-26 · FM/TALK</div>
+          <div class="lamps">
+            <span id="lamp-rx" class="lamp rx" title="Receiving">RX</span>
+            <span id="lamp-air" class="lamp air" title="In a room">ON AIR</span>
+          </div>
+        </header>
+        <div class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><div class="sticker tape">3RD SPACE</div></div>
+
+        <section class="lcd" id="lcd" aria-live="polite">
+          <div class="lcd-row top">
+            <span id="lcd-ch">CH --</span>
+            <span id="lcd-freq" class="freq">--.- FM</span>
+            <span id="lcd-band">ANY</span>
+          </div>
+          <div class="lcd-title"><span id="lcd-title">WARMING UP…</span></div>
+          <div class="lcd-row">
+            <span id="lcd-info"></span>
+            <span id="lcd-signal" class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          </div>
+        </section>
+
+        <section class="glass" id="glass" aria-label="Rooms on this band">
+          <div class="scale" aria-hidden="true">
+            <span>88</span><span>92</span><span>96</span><span>100</span><span>104</span><span>108</span>
+          </div>
+          <div id="markers" class="markers"></div>
+          <div id="needle" class="needle" aria-hidden="true"></div>
+        </section>
+
+        <div class="dymo" aria-hidden="true">BAND</div>
+        <nav id="bands" class="bands" aria-label="Bands"></nav>
+
+        <section class="deck">
+          <div class="speaker">
+            <div id="grille" class="grille" role="img" aria-label="People in the room"></div>
+            <div id="grille-key" class="grille-key"></div>
+          </div>
+
+          <div class="controls">
+            <div class="knob-well">
+              <button id="knob" class="knob" type="button" aria-label="Tune: next room (drag, scroll or use arrow keys)">
+                <span class="grip" aria-hidden="true"></span>
+              </button>
+              <div class="dymo small" aria-hidden="true">TUNE</div>
+            </div>
+
+            <div class="slide" role="radiogroup" aria-label="Order rooms by">
+              <button type="button" data-sort="busy" role="radio">BUSY</button>
+              <button type="button" data-sort="fresh" role="radio">FRESH</button>
+              <button type="button" data-sort="cozy" role="radio">COZY</button>
+            </div>
+
+            <div class="toggles">
+              <label class="toggle"><input id="scan-on" type="checkbox"><span></span>SCAN</label>
+              <select id="scan-min" aria-label="Minutes per room while scanning">
+                <option value="2">2m</option><option value="5" selected>5m</option>
+                <option value="10">10m</option><option value="20">20m</option>
+              </select>
+              <label class="toggle"><input id="sfx-on" type="checkbox" checked><span></span>SFX</label>
+            </div>
+          </div>
+        </section>
+
+        <a id="ptt" class="ptt" href="#" target="spaces-radio" rel="noopener">
+          <span class="ribs" aria-hidden="true"></span>
+          <span class="ptt-label"><b id="ptt-text">PUSH TO JOIN</b><small id="ptt-sub">opens the room in X · listen or grab the mic</small></span>
+        </a>
+
+        <div class="dymo" aria-hidden="true">PRESETS</div>
+        <div id="presets" class="presets"></div>
+
+        <div class="sticker smile" aria-hidden="true"><span>REAL<br>PEOPLE<br>ONLY</span></div>
+      </div>
+    </div>
+
+    <aside class="manual">
+      <h1>Owner's manual</h1>
+      <p class="lede">A walkie-talkie radio for live X Spaces. Every channel is a room of real people talking right now. Flip through them the way you'd flip through a feed.</p>
+
+      <ol class="steps">
+        <li><b>BAND</b> picks what it's about. Rooms on the glass are live, and taller ones are busier.</li>
+        <li><b>TUNE</b>: turn the knob, swipe the screen, or press ← →.</li>
+        <li><b>PUSH TO JOIN</b> opens the room in X (the app, on a phone). Listen, or request the mic.</li>
+        <li><b>SCAN</b> (on a computer) hops to a new room every few minutes while you work.</li>
+      </ol>
+
+      <h2>Program a preset</h2>
+      <p>Found a live room on your phone or in a post? Paste its link and it gets a preset button. Presets live in this browser only.</p>
+      <form id="add-form" class="add">
+        <input id="add-link" placeholder="x.com/i/spaces/…" required autocomplete="off" inputmode="url" aria-label="Space link">
+        <input id="add-title" placeholder="What's it about?" autocomplete="off" maxlength="80" aria-label="Name (optional)">
+        <button type="submit">Program</button>
+      </form>
+      <p id="add-msg" class="msg" role="status"></p>
+      <ul id="preset-list" class="preset-list"></ul>
+      <a id="hunt" class="hunt" target="_blank" rel="noopener">Hunt for rooms people are sharing on X ↗</a>
+
+      <h2>Reading the speaker</h2>
+      <p class="legend"><i class="d host"></i> host <i class="d mic"></i> on the mic <i class="d ear"></i> listening</p>
+      <p>Every room plays inside X, so hosts keep their controls: they pick speakers and can mute, remove or block anyone.</p>
+
+      <footer id="foot" class="foot"></footer>
+    </aside>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

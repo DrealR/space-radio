@@ -1,9 +1,9 @@
 """Where rooms come from (Head First ch. 1, Strategy).
 
 The radio asks a SpaceSource for live rooms on a topic and never cares how
-they were found. Today: the X API (paid, guarded) and rooms Reemy saves by
-pasting a link (free). Clubhouse, Telegram voice chats or anything else later
-is one new class; the dial doesn't change.
+they were found. Today: the X API (paid, guarded). Rooms people paste in live
+in their own browser. A shared community list, Clubhouse or Telegram voice
+chats later are one new class each; the dial doesn't change.
 """
 from __future__ import annotations
 
@@ -12,14 +12,14 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 from typing import Callable, Protocol
 
 from .budget import Budget
 from .space import Space, parse_space_id
 
 SEARCH_URL = "https://api.x.com/2/spaces/search"
-FIELDS = "title,participant_count,started_at,lang,state,is_ticketed"
+# host_ids / speaker_ids are plain id lists on the Space (no user lookups, no extra cost).
+FIELDS = "title,participant_count,started_at,lang,state,is_ticketed,host_ids,speaker_ids"
 
 
 class SourceError(Exception):
@@ -44,7 +44,7 @@ class XApiSource:
 
     name = "x-api"
 
-    def __init__(self, token: str, budget: Budget, max_results: int = 20,
+    def __init__(self, token: str, budget: Budget, max_results: int = 10,
                  cache_seconds: int = 600, fetch: Callable[[str, str], dict] = _http_get_json,
                  now: Callable[[], float] = time.time):
         if not token:
@@ -62,7 +62,7 @@ class XApiSource:
         if hit and self._now() - hit[0] < self._ttl:
             return hit[1]
         if not self._budget.can_afford(self._max):
-            raise SourceError("Today's X budget is used up; saved rooms still play.")
+            raise SourceError("Today's X budget is used up; rooms people pasted still play.")
         query = urllib.parse.urlencode({
             "query": topic, "state": "live", "max_results": self._max, "space.fields": FIELDS,
         })
@@ -97,56 +97,13 @@ def _to_space(item: dict, topic: str) -> Space | None:
         id=space_id,
         title=str(item.get("title") or "Untitled room")[:200],
         listeners=int(item.get("participant_count") or 0),
+        speakers=len(item.get("speaker_ids") or []),
+        hosts=len(item.get("host_ids") or []),
         started_at=str(item.get("started_at") or ""),
         lang=str(item.get("lang") or ""),
         topic=topic,
         source="x-api",
     )
-
-
-class SavedSource:
-    """Rooms Reemy pasted in (from the phone's Spaces tab, a friend, a post).
-    Free. Whether one is still live is only known once you tune in."""
-
-    name = "saved"
-
-    def __init__(self, path: Path):
-        self._path = path
-
-    def all(self) -> list[Space]:
-        try:
-            rows = json.loads(self._path.read_text())
-        except FileNotFoundError:
-            return []
-        except ValueError as err:
-            raise SourceError(f"saved rooms file is damaged: {err}") from err
-        return [Space(id=r["id"], title=r.get("title") or "Saved room", topic=r.get("topic", ""),
-                      source="saved", live=False) for r in rows if parse_space_id(r.get("id", ""))]
-
-    def live(self, topic: str) -> list[Space]:
-        # Saved rooms are yours: they ride along on every station.
-        return self.all()
-
-    def add(self, link: str, title: str = "", topic: str = "") -> Space:
-        space_id = parse_space_id(link)
-        if not space_id:
-            raise ValueError("That doesn't look like a Space link (x.com/i/spaces/…).")
-        room = Space(id=space_id, title=title.strip()[:200] or "Saved room",
-                     topic=topic.strip()[:40], source="saved", live=False)
-        others = [r for r in self.all() if r.id != space_id]
-        self._write([room, *others])
-        return room
-
-    def remove(self, space_id: str) -> bool:
-        rooms = self.all()
-        kept = [r for r in rooms if r.id != space_id]
-        self._write(kept)
-        return len(kept) != len(rooms)
-
-    def _write(self, rooms: list[Space]) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        rows = [{"id": r.id, "title": r.title, "topic": r.topic} for r in rooms]
-        self._path.write_text(json.dumps(rows, indent=1))
 
 
 def gather(sources: list[SpaceSource], topic: str) -> tuple[list[Space], list[str]]:

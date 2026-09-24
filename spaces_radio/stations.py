@@ -27,7 +27,7 @@ def tune(station: str, sources: list[SpaceSource]) -> tuple[list[Space], list[st
     for word in STATIONS[station]:
         found, errs = gather(sources, word)
         for space in found:
-            rooms.setdefault(space.id, space if space.source == "saved" else space.tagged(station))
+            rooms.setdefault(space.id, space.tagged(station))
         problems.extend(e for e in errs if e not in problems)
-    ordered = sorted(rooms.values(), key=lambda s: (not s.live, -s.listeners))
+    ordered = sorted(rooms.values(), key=lambda s: -s.listeners)
     return ordered, problems

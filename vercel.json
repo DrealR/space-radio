@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/*.py": { "includeFiles": "spaces_radio/**", "maxDuration": 30 }
+  }
+}

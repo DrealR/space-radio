@@ -14,10 +14,12 @@ class Space:
     id: str
     title: str
     listeners: int = 0
+    speakers: int = 0
+    hosts: int = 0
     started_at: str = ""
     lang: str = ""
     topic: str = ""
-    source: str = ""  # "x-api" or "saved"
+    source: str = ""  # "x-api" or "yours" (pasted in the browser)
     live: bool = True
 
     @property
@@ -30,6 +32,7 @@ class Space:
     def to_json(self) -> dict:
         return {
             "id": self.id, "title": self.title, "listeners": self.listeners,
+            "speakers": self.speakers, "hosts": self.hosts,
             "started_at": self.started_at, "lang": self.lang, "topic": self.topic,
             "source": self.source, "live": self.live, "url": self.url,
         }
