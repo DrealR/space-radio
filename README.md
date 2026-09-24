@@ -55,9 +55,20 @@ no matter how often it's seen. So cost follows *how many distinct rooms show up*
 
 Tests (no network): `python3 -m unittest discover -s tests -t .` and `node --test tests/*.mjs`.
 
+## Roadmap
+
+- **Favorite hosts.** X's Activity API sends `spaces.start` / `spaces.end` events for chosen accounts
+  (webhook or stream). A webhook function plus a small store would let the radio light up the moment
+  a host you love goes live. Needs storage and a webhook secret; billing for these events is unstated.
+- **Community rooms.** Anyone who finds a live room can add it to a shared list (free, needs storage and light moderation).
+- **Preset check.** Mark presets live or ended with one Spaces lookup, $0.005 per room per day.
+
 ## Limits
 
 - Audio plays in X, not in this page, because X offers no public audio stream for Spaces.
-  On a computer you need to be signed in to X, and X may ask you to click "Start listening".
+  X may ask you to click "Start listening".
+- X's pages may cut the radio off from the X window it opens (`Cross-Origin-Opener-Policy`).
+  The radio detects this. If it can steer the window, the dial and SCAN switch rooms for you.
+  If it can't, flipping queues the next room and the button reads PUSH TO SWITCH, so two rooms never play at once.
 - Presets don't know whether a room is still live until you join it.
 - The live X path is tested against a fake API only until a real key is added.

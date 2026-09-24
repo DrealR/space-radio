@@ -4,6 +4,7 @@ import {
   parseSpaceId, position, removePreset, signalBars,
 } from "./js/rooms.js";
 import { joinCopy, qrSvg } from "./js/handoff.js";
+import { planJoin, readWindow } from "./js/listener.js";
 import { rogerBeep, staticBurst } from "./js/sfx.js";
 
 const WINDOW_NAME = "spaces-radio";
@@ -20,10 +21,12 @@ const coarse = window.matchMedia("(pointer: coarse)").matches;
 
 let state = {
   bands: [], band: "anything", live: [], presets: [], sort: "busy", currentId: null,
-  listening: false, scan: false, scanMin: 5, scanAt: 0, sfx: true, liveSearch: false,
+  listening: false, playingId: null, steer: "unknown",
+  scan: false, scanMin: 5, scanAt: 0, sfx: true, liveSearch: false,
   loading: true, problems: [], flash: "", turn: 0,
 };
 let listenWindow = null;
+let openedAt = 0;
 let flashTimer = 0;
 let userActed = false; // browsers only allow sound after a tap or key press
 
@@ -74,9 +77,8 @@ function select(id, { quiet = false } = {}) {
   const from = currentIndex(d);
   const to = Math.max(0, d.findIndex((r) => r.id === id));
   if (!quiet && d.length) crackle();
-  set({ currentId: id, turn: state.turn + (to - from) * KNOB_STEP_DEG,
-        scanAt: state.scan && state.listening ? Date.now() + state.scanMin * 60000 : 0 });
-  if (state.listening && !coarse) join(current());
+  set({ currentId: id, turn: state.turn + (to - from) * KNOB_STEP_DEG });
+  if (state.listening) join(current());
 }
 
 function step(delta) {
@@ -84,24 +86,31 @@ function step(delta) {
   if (d.length < 2) return;
   const i = (currentIndex(d) + delta + d.length) % d.length;
   crackle();
-  set({ currentId: d[i].id, turn: state.turn + delta * KNOB_STEP_DEG,
-        scanAt: state.scan && state.listening ? Date.now() + state.scanMin * 60000 : 0 });
-  if (state.listening && !coarse) join(current());
+  set({ currentId: d[i].id, turn: state.turn + delta * KNOB_STEP_DEG });
+  if (state.listening) join(current());
 }
 
-/** Desktop: open one listening window and steer it. Phone: the link opens the X app itself. */
-function join(room) {
-  if (!room) return false;
-  if (!coarse) {
-    if (listenWindow && !listenWindow.closed) listenWindow.location.href = room.url;
-    else listenWindow = window.open(room.url, WINDOW_NAME);
+const nextScan = () => (state.scan ? Date.now() + state.scanMin * 60000 : 0);
+
+/**
+ * Put a room on air. Steers the open X window when X allows it; otherwise waits for
+ * a push (the button then reads PUSH TO SWITCH), so two rooms never play at once.
+ */
+function join(room, { gesture = false } = {}) {
+  if (!room) return;
+  const alive = Boolean(listenWindow && !listenWindow.closed);
+  const plan = planJoin({ phone: coarse, steer: state.steer, windowAlive: alive, gesture });
+  if (plan === "pending") return;
+  if (plan === "steer") listenWindow.location.href = room.url;
+  if (plan === "open") {
+    listenWindow = window.open(room.url, WINDOW_NAME);
     if (!listenWindow) {
       set({ problems: ["Your browser blocked the listening window. Allow pop-ups for this page."] });
-      return false;
+      return;
     }
+    openedAt = Date.now();
   }
-  set({ listening: true, scanAt: state.scan ? Date.now() + state.scanMin * 60000 : 0 });
-  return true;
+  set({ listening: true, playingId: room.id, problems: [], scanAt: nextScan() });
 }
 
 async function tuneBand(band, { refresh = false } = {}) {
@@ -118,15 +127,26 @@ async function tuneBand(band, { refresh = false } = {}) {
   const stillThere = keepId && buildDeck(live, state.sort, state.presets).some((r) => r.id === keepId);
   set({ live, loading: false, problems: res.meta.problems || [],
         currentId: stillThere ? keepId : buildDeck(live, state.sort, state.presets)[0]?.id ?? null });
-  if (switching && state.listening && !coarse) join(current());
+  if (switching && state.listening) join(current());
 }
 
 function tick() {
-  if (state.listening && !coarse && listenWindow && listenWindow.closed) {
-    listenWindow = null;
-    set({ listening: false, scanAt: 0 });
+  if (!coarse && listenWindow) {
+    const alive = !listenWindow.closed;
+    const seen = readWindow({ steer: state.steer, openedAt, now: Date.now(), alive });
+    if (!alive) listenWindow = null;
+    if (seen.userClosed) set({ steer: seen.steer, listening: false, playingId: null, scanAt: 0 });
+    else if (seen.steer !== state.steer) set({ steer: seen.steer });
   }
-  if (state.scan && state.listening && state.scanAt && Date.now() >= state.scanAt) step(1);
+  if (state.scan && state.listening && state.scanAt && Date.now() >= state.scanAt) {
+    step(1);
+    if (current()?.id !== state.playingId) {
+      // X won't let us switch rooms for you: queue the next one and nudge.
+      if (state.sfx) rogerBeep();
+      flash("NEW ROOM READY · PUSH");
+      set({ scanAt: nextScan() });
+    }
+  }
 }
 
 // ---- presets -----------------------------------------------------------------
@@ -295,9 +315,11 @@ function renderControls(room) {
   const ptt = $("ptt");
   ptt.href = room ? room.url : "#";
   ptt.classList.toggle("off", !room);
-  const copy = joinCopy({ phone: coarse, listening: state.listening });
+  const here = Boolean(room) && room.id === state.playingId;
+  const copy = joinCopy({ phone: coarse, listening: state.listening, here, steer: state.steer });
   $("ptt-text").textContent = copy.text;
   $("ptt-sub").textContent = copy.sub;
+  ptt.classList.toggle("pending", state.listening && !here);
   $("mic").hidden = coarse;
   $("mic").disabled = !room;
   $("knob").style.setProperty("--turn", `${state.turn}deg`);
@@ -375,7 +397,8 @@ function wire() {
     const room = current();
     if (!room) return e.preventDefault();
     if (state.sfx) rogerBeep();
-    if (!coarse) { e.preventDefault(); join(room); } else { set({ listening: true }); }
+    if (!coarse) e.preventDefault(); // on a phone the link itself opens the X app
+    join(room, { gesture: true });
   });
   document.querySelectorAll(".slide button").forEach((b) => b.addEventListener("click", () => {
     set({ sort: b.dataset.sort });

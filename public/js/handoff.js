@@ -2,16 +2,22 @@
 // So on a computer the radio listens, and MIC hands the room to your phone as a QR code.
 import qrcode from "../vendor/qrcode.mjs";
 
-/** Words on the big button, by device and whether you're already in a room. */
-export function joinCopy({ phone, listening }) {
-  if (phone) {
-    return listening
-      ? { text: "YOU'RE IN", sub: "tap to reopen · come back and swipe for more" }
-      : { text: "PUSH TO JOIN", sub: "opens the X app · listen or request the mic" };
+/** Words on the big button: by device, whether you're on air, and whether this is the room playing. */
+export function joinCopy({ phone, listening, here = true, steer = "unknown" }) {
+  if (!listening) {
+    return phone
+      ? { text: "PUSH TO JOIN", sub: "opens the X app · listen or request the mic" }
+      : { text: "PUSH TO LISTEN", sub: "plays in X on the web · to talk, press MIC" };
   }
-  return listening
-    ? { text: "LISTENING", sub: "the X window follows the dial · MIC to talk" }
-    : { text: "PUSH TO LISTEN", sub: "plays in X on the web · to talk, press MIC" };
+  if (!here) {
+    return phone
+      ? { text: "PUSH TO SWITCH", sub: "opens this room in the X app" }
+      : { text: "PUSH TO SWITCH", sub: "opens in a new X tab · close the old one" };
+  }
+  if (phone) return { text: "YOU'RE IN", sub: "tap to reopen · come back and swipe for more" };
+  return { text: "LISTENING", sub: steer === "yes"
+    ? "the X window follows the dial · MIC to talk"
+    : "playing in your X tab · MIC to talk" };
 }
 
 /** QR modules as one SVG path in module units (quiet zone added by the caller). */

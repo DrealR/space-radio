@@ -20,7 +20,7 @@ from .service import Reply, RadioService, envelope, service_from_env, write_repl
 PUBLIC = Path(__file__).resolve().parent.parent / "public"
 PORT = int(os.environ.get("SPACES_RADIO_PORT", "8740"))
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
-         ".svg": "image/svg+xml"}
+         ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json"}
 
 
 def make_handler(service: RadioService):
