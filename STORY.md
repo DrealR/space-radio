@@ -1,4 +1,4 @@
-# Why I built Spaces Radio
+# Why I built Space Radio
 
 ## The problem
 
@@ -34,6 +34,20 @@ walkie-talkie. The difference from a radio is that you're allowed to talk back.
 - **MIC** hands the room to your phone with a QR code, because on X the web can only listen and
   talking happens in the app.
 
+## Why "Space Radio"
+
+I think of the internet as space. Your phone is your ship: from it you can reach anywhere and anyone.
+An X Space is another ship, a group of people floating together and talking.
+
+Most of what you find out there is old light. A post or a video left its source hours or years ago,
+and anything you say back arrives late, the way signals take time to cross space. Livestreams come
+closer to real time, but they're one person with a crowd watching. A Space has no delay and it's a
+group, which is why it feels like being around people.
+
+Today the radio picks up X Spaces. The same radio could tune into other live rooms later:
+Clubhouse, Telegram voice chats, whatever comes next. And if your own AI system is the ship, this
+is the radio on its dashboard.
+
 ## How it works
 
 ```
@@ -51,7 +65,8 @@ browser (the radio) ──▶ /api/tune?station=music ──▶ X API: search li
 
 ## Use it or build your own
 
-- Live: https://spaces-radio.vercel.app
+- Live: https://space-radio-fm.vercel.app
+- Code: https://github.com/DrealR/space-radio
 - Your own copy: deploy this folder to Vercel, add your X API bearer token as `X_BEARER_TOKEN`,
   and set a spending limit in the X Developer Console. The README has details and tests.
 

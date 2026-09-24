@@ -1,7 +1,7 @@
 {
-  "name": "Spaces Radio",
-  "short_name": "Spaces Radio",
-  "description": "Flip through live X Spaces like a radio. Real people, talking right now.",
+  "name": "Space Radio",
+  "short_name": "Space Radio",
+  "description": "Every X Space is a ship full of people, talking live. Tune in and flip through.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a120d",

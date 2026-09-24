@@ -1,6 +1,8 @@
-# Spaces Radio SR-26
+# Space Radio SR-26
 
-A walkie-talkie radio for live X Spaces. Each channel is a room of real people talking right now.
+Live: https://space-radio-fm.vercel.app · Code: https://github.com/DrealR/space-radio
+
+A walkie-talkie radio for your ship. Each channel is a live X Space: another ship full of real people talking right now.
 Flip through rooms like a feed, listen while you work, and grab the mic if you want to.
 Built Sep 23, 2026 for winter nights, when the park is too cold. The why: [STORY.md](STORY.md).
 

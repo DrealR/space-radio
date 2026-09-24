@@ -1,4 +1,4 @@
-"""Spaces Radio, local dev server. Same answers as the Vercel functions.
+"""Space Radio, local dev server. Same answers as the Vercel functions.
 
     python3 -m spaces_radio.server            # no key: people paste rooms they find
     python3 ~/Morrow/tools/mo_keys.py run --project spaces-radio -- python3 -m spaces_radio.server
@@ -53,7 +53,7 @@ def main() -> None:
     service = service_from_env()
     server = ThreadingHTTPServer(("127.0.0.1", PORT), make_handler(service))
     mode = "live search on" if service.live_search else "no X key: pasted rooms only"
-    print(f"Spaces Radio · http://127.0.0.1:{PORT} · {mode}")
+    print(f"Space Radio · http://127.0.0.1:{PORT} · {mode}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

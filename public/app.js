@@ -1,4 +1,4 @@
-// Spaces Radio SR-26. State is replaced, never edited in place; render() draws it.
+// Space Radio SR-26. State is replaced, never edited in place; render() draws it.
 import {
   GRILLE_DOTS, MAX_PRESETS, addPreset, ago, bandLabel, buildDeck, frequency, grillePlan,
   parseSpaceId, position, removePreset, signalBars,

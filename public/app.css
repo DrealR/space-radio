@@ -1,5 +1,6 @@
-/* Spaces Radio SR-26 — a 1970s handheld that learned to talk. */
+/* Space Radio SR-26 — a 1970s handheld that learned to talk, riding in your ship. */
 :root {
+  --sky: #0b0912;
   --wall: #1a120d;
   --wall-2: #2a1a10;
   --lamp: rgba(255, 170, 90, .16);
@@ -27,8 +28,9 @@
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --wall: #d9c7a6; --wall-2: #c9b18a; --lamp: rgba(255, 244, 220, .6);
+    --sky: #c9d3e6; --wall: #d9c7a6; --wall-2: #c9b18a; --lamp: rgba(255, 244, 220, .6);
   }
+  :root:not([data-theme="dark"]) body::before, :root:not([data-theme="dark"]) body::after { display: none; }
 }
 
 * { box-sizing: border-box; }
@@ -38,10 +40,106 @@ body {
   margin: 0; min-height: 100vh; color: var(--paper-ink); font: 15px/1.55 var(--mono);
   background:
     radial-gradient(ellipse 60% 45% at 30% 8%, var(--lamp), transparent 70%),
-    repeating-linear-gradient(90deg, transparent 0 46px, rgba(0,0,0,.07) 46px 48px),
-    linear-gradient(var(--wall), var(--wall-2));
+    radial-gradient(ellipse 80% 50% at 80% 0%, rgba(90, 110, 200, .12), transparent 70%),
+    linear-gradient(var(--sky), var(--wall) 55%, var(--wall-2));
   background-attachment: fixed;
 }
+/* Out the ship's window: a fixed sky, and a few stars that breathe. */
+body::before, body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1; }
+body::before {
+  background:
+    radial-gradient(1px 1px at 74.7% 20.3%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1.8px 1.8px at 60.1% 5.7%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 73.0% 62.3%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.8px 1.8px at 43.0% 24.2%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 84.4% 78.6%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 93.8% 22.2%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1.8px 1.8px at 59.7% 83.9%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 24.4% 58.4%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 29.3% 54.4%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.4px 1.4px at 4.4% 0.8%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 85.1% 42.3%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1.8px 1.8px at 88.1% 25.1%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 60.7% 15.6%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 12.6% 54.9%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 40.7% 37.0%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 32.7% 40.7%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 70.6% 58.2%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 9.6% 24.0%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1.8px 1.8px at 67.9% 27.6%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 52.1% 60.3%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 15.2% 0.8%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 94.5% 68.8%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 18.3% 61.1%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 4.9% 97.3%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 29.2% 89.9%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.8px 1.8px at 86.8% 88.0%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.8px 1.8px at 2.3% 94.0%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1.8px 1.8px at 64.9% 54.7%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1.8px 1.8px at 10.1% 96.6%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1.8px 1.8px at 30.6% 14.5%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 62.3% 31.6%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 92.0% 6.6%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 4.4% 14.4%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1.8px 1.8px at 6.7% 28.1%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 21.8% 49.9%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 91.4% 71.5%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 21.3% 75.8%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 73.4% 3.8%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 94.0% 98.5%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 48.5% 11.6%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 16.8% 5.9%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1.8px 1.8px at 26.1% 19.5%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.4px 1.4px at 72.1% 32.4%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1.8px 1.8px at 90.3% 29.2%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 83.4% 40.5%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 99.8% 79.8%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.4px 1.4px at 29.7% 97.5%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 71.4% 69.4%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.8px 1.8px at 70.9% 76.3%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 9.5% 1.3%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 86.6% 74.4%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 37.9% 64.1%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.8px 1.8px at 69.2% 11.8%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 94.6% 64.4%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 25.2% 59.8%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.4px 1.4px at 81.1% 65.0%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 22.2% 14.2%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1.4px 1.4px at 76.4% 22.0%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1.8px 1.8px at 82.8% 97.3%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1.8px 1.8px at 44.7% 29.8%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 44.2% 20.6%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1px 1px at 7.7% 23.3%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1px 1px at 10.6% 77.8%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.4px 1.4px at 46.0% 11.9%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.8px 1.8px at 41.3% 88.9%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1px 1px at 19.7% 21.7%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.8px 1.8px at 62.5% 92.2%, rgba(255,246,225,0.5), transparent),
+    radial-gradient(1.8px 1.8px at 48.8% 95.1%, rgba(255,246,225,0.7), transparent),
+    radial-gradient(1.4px 1.4px at 50.3% 3.3%, rgba(255,246,225,0.35), transparent),
+    radial-gradient(1.4px 1.4px at 62.3% 85.5%, rgba(255,246,225,0.7), transparent);
+}
+body::after {
+  background:
+    radial-gradient(2.4px 2.4px at 89.3% 50.8%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2.4px 2.4px at 67.4% 98.4%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2px 2px at 74.3% 1.1%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2px 2px at 98.5% 24.1%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2.4px 2.4px at 92.4% 58.6%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2px 2px at 55.6% 75.3%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2.4px 2.4px at 52.0% 89.4%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2px 2px at 16.0% 14.3%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2.4px 2.4px at 39.3% 5.3%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2.4px 2.4px at 59.2% 49.3%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2px 2px at 5.7% 27.4%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2px 2px at 78.6% 37.1%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2px 2px at 53.7% 62.1%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2.4px 2.4px at 35.5% 78.5%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2.4px 2.4px at 48.4% 28.9%, rgba(255,246,225,0.9), transparent),
+    radial-gradient(2.4px 2.4px at 41.4% 94.0%, rgba(255,246,225,0.9), transparent);
+  animation: twinkle 5s ease-in-out infinite alternate;
+}
+@keyframes twinkle { from { opacity: .25; } to { opacity: 1; } }
 button, input, select { font: inherit; }
 a { color: inherit; }
 
@@ -254,6 +352,11 @@ a { color: inherit; }
 .smile { right: -18px; bottom: -40px; width: 70px; height: 70px; border-radius: 50%; transform: rotate(12deg);
   background: radial-gradient(circle at 35% 30%, #ffe45c, #f7c600); box-shadow: 0 3px 6px rgba(0,0,0,.3);
   display: grid; place-items: center; text-align: center; font: 700 9px/1.1 var(--mono); color: #3b2a00; }
+.ufo { left: -26px; top: 47%; width: 62px; height: 62px; border-radius: 50%; transform: rotate(-12deg);
+  background: #fffaf0; box-shadow: 0 3px 6px rgba(0,0,0,.35); display: grid; place-items: center; }
+.ufo svg { width: 52px; height: 52px; }
+.radio.live .ufo svg { animation: hover 2.4s ease-in-out infinite; }
+@keyframes hover { 50% { transform: translateY(-3px) rotate(3deg); } }
 .tape { left: 6px; top: -7px; transform: rotate(-6deg); padding: 3px 10px; background: #1f5fae;
   color: #fff; font: 700 11px var(--mono); letter-spacing: .25em; box-shadow: 0 2px 3px rgba(0,0,0,.35); }
 
@@ -315,6 +418,8 @@ a { color: inherit; }
   .knob { width: 88px; height: 88px; }
   .lcd-title { font-size: 30px; }
   .smile { right: -6px; bottom: -36px; width: 56px; height: 56px; font-size: 8px; }
+  .ufo { left: -10px; width: 50px; height: 50px; }
+  .ufo svg { width: 42px; height: 42px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

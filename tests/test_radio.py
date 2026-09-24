@@ -1,4 +1,4 @@
-"""Spaces Radio tests. No network: the X API is a fake that records its calls."""
+"""Space Radio tests. No network: the X API is a fake that records its calls."""
 import json
 import tempfile
 import threading
@@ -240,7 +240,7 @@ class ServerTests(TmpCase):
         self.assertEqual(headers["Cache-Control"], "no-store")
 
     def test_serves_page_and_modules_but_not_outside_public(self):
-        self.assertIn(b"SPACES", self.get("/")[2])
+        self.assertIn(b"<title>Space Radio</title>", self.get("/")[2])
         self.assertEqual(self.get("/js/rooms.js")[0], 200)
         self.assertEqual(self.get("/../spaces_radio/service.py")[0], 404)
         self.assertEqual(self.get("/%2e%2e/README.md")[0], 404)
