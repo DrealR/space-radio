@@ -3,6 +3,7 @@ import {
   GRILLE_DOTS, MAX_PRESETS, addPreset, ago, bandLabel, buildDeck, frequency, grillePlan,
   parseSpaceId, position, removePreset, signalBars,
 } from "./js/rooms.js";
+import { joinCopy, qrSvg } from "./js/handoff.js";
 import { rogerBeep, staticBurst } from "./js/sfx.js";
 
 const WINDOW_NAME = "spaces-radio";
@@ -154,6 +155,33 @@ function programPreset(event) {
   storePresets(presets);
 }
 
+// ---- handoff to phone (the web can listen; only the X app can talk) ------------
+function openHandoff() {
+  const room = current();
+  if (!room) return;
+  if (state.sfx) rogerBeep();
+  $("handoff-room").textContent = room.title;
+  try {
+    $("handoff-qr").replaceChildren(qrSvg(room.url));
+  } catch (err) {
+    console.warn("[spaces-radio] QR failed", err);
+    $("handoff-qr").replaceChildren(el("p", { textContent: room.url }));
+  }
+  $("handoff-copy").textContent = "Copy link";
+  $("handoff").showModal();
+}
+
+async function copyRoomLink() {
+  const room = current();
+  if (!room) return;
+  try {
+    await navigator.clipboard.writeText(room.url);
+    $("handoff-copy").textContent = "Copied ✓";
+  } catch {
+    $("handoff-copy").textContent = "Copy blocked";
+  }
+}
+
 // ---- drawing -------------------------------------------------------------------
 function el(tag, props = {}, ...children) {
   const node = Object.assign(document.createElement(tag), props);
@@ -267,10 +295,11 @@ function renderControls(room) {
   const ptt = $("ptt");
   ptt.href = room ? room.url : "#";
   ptt.classList.toggle("off", !room);
-  $("ptt-text").textContent = state.listening ? "YOU'RE IN" : "PUSH TO JOIN";
-  $("ptt-sub").textContent = state.listening
-    ? (coarse ? "tap to reopen · come back and swipe for more" : "the X window follows the dial")
-    : "opens the room in X · listen or grab the mic";
+  const copy = joinCopy({ phone: coarse, listening: state.listening });
+  $("ptt-text").textContent = copy.text;
+  $("ptt-sub").textContent = copy.sub;
+  $("mic").hidden = coarse;
+  $("mic").disabled = !room;
   $("knob").style.setProperty("--turn", `${state.turn}deg`);
   document.querySelectorAll(".slide button").forEach((b) =>
     b.setAttribute("aria-checked", String(b.dataset.sort === state.sort)));
@@ -361,8 +390,12 @@ function wire() {
   });
   $("sfx-on").addEventListener("change", (e) => { set({ sfx: e.target.checked }); savePrefs(); });
   $("add-form").addEventListener("submit", programPreset);
+  $("mic").addEventListener("click", openHandoff);
+  $("handoff-copy").addEventListener("click", copyRoomLink);
+  $("handoff-close").addEventListener("click", () => $("handoff").close());
+  $("handoff").addEventListener("click", (e) => { if (e.target === $("handoff")) $("handoff").close(); });
   document.addEventListener("keydown", (e) => {
-    if (e.target.closest("input, select, textarea")) return;
+    if (e.target.closest("input, select, textarea") || $("handoff").open) return;
     if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); step(1); }
     if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); step(-1); }
   });

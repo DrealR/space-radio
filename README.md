@@ -2,12 +2,14 @@
 
 A walkie-talkie radio for live X Spaces. Each channel is a room of real people talking right now.
 Flip through rooms like a feed, listen while you work, and grab the mic if you want to.
-Built Sep 23, 2026 for winter nights, when the park is too cold.
+Built Sep 23, 2026 for winter nights, when the park is too cold. The why: [STORY.md](STORY.md).
 
 - **BAND** keys choose the topic. The **glass** shows every live room on that band: taller means busier.
 - **TUNE** knob, swipe or ← → flips rooms, with static in between.
 - **Speaker grille**: one dot per person. Amber dots are hosts, green dots are on the mic, cream dots are listening.
-- **PUSH TO JOIN** opens the room in X (the X app on a phone), where you can listen or request the mic.
+- **PUSH TO LISTEN / JOIN** opens the room in X. Anyone can listen on a computer, even without an account.
+- **MIC** (computer) shows a QR code that carries the room to your phone, because on X the web can only
+  listen. Talking needs the X app and an account.
 - **SCAN** (computer only) hops to a new room every few minutes and steers the same X window.
 - **Presets** save rooms. They live in each person's own browser.
 
@@ -48,6 +50,7 @@ no matter how often it's seen. So cost follows *how many distinct rooms show up*
 - `service.py`: what the radio answers (and how long it may be cached), shared by the local server and Vercel.
 - `stations.py`: band → search words. Edit these to change the dial.
 - `public/js/rooms.js`: pure helpers (sorting, the FM dial, the crowd in the grille, presets).
+  `handoff.js`: the MIC-to-phone QR (uses the vendored MIT `qrcode-generator` 2.0.4 in `public/vendor/`).
   `sfx.js`: static and roger beep made with Web Audio. `app.js`: state and drawing.
 
 Tests (no network): `python3 -m unittest discover -s tests -t .` and `node --test tests/*.mjs`.

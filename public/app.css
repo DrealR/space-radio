@@ -168,10 +168,10 @@ a { color: inherit; }
 }
 
 /* speaker + controls */
-.deck { display: grid; grid-template-columns: 1fr 132px; gap: 16px; margin-top: 20px; }
+.deck { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 16px; margin-top: 20px; }
 .speaker { background: var(--panel); border-radius: 18px; padding: 14px 12px 10px;
   box-shadow: inset 0 3px 10px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.6); }
-.grille { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; }
+.grille { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
 .grille i { aspect-ratio: 1; border-radius: 50%; background: #120e0b; box-shadow: inset 0 2px 3px rgba(0,0,0,.9); transition: background .4s, box-shadow .4s; }
 .grille i.ear { background: var(--ear); box-shadow: 0 0 5px rgba(246,230,196,.55); opacity: .75; }
 .grille i.mic { background: var(--mic); box-shadow: 0 0 8px var(--mic); animation: talk 1.6s ease-in-out infinite; }
@@ -209,8 +209,10 @@ a { color: inherit; }
 .toggles .sfx { grid-column: 1 / -1; }
 
 /* push to talk */
+.ptt-row { display: flex; gap: 10px; margin-top: 20px; }
 .ptt {
-  display: flex; align-items: center; gap: 14px; margin-top: 20px; padding: 16px 18px; border-radius: 16px;
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 16px;
   text-decoration: none; color: #fff; cursor: pointer; position: relative;
   background: linear-gradient(#ff7a33, #d9500f); box-shadow: 0 7px 0 #8a300a, 0 12px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.35);
   transition: transform .06s, box-shadow .06s;
@@ -222,6 +224,16 @@ a { color: inherit; }
 .ptt-label { display: flex; flex-direction: column; }
 .ptt-label b { font: 20px/1 Bungee, var(--mono); letter-spacing: .02em; }
 .ptt-label small { font-size: 11px; opacity: .9; margin-top: 5px; }
+
+.talk {
+  flex: none; width: 84px; border: 0; border-radius: 16px; cursor: pointer; color: #f6e6c4;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  background: linear-gradient(#3a302a, #1f1916); box-shadow: 0 7px 0 #0f0b09, 0 12px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.15);
+  font: 700 11px var(--mono); letter-spacing: .2em; transition: transform .06s, box-shadow .06s;
+}
+.talk:active { transform: translateY(5px); box-shadow: 0 2px 0 #0f0b09; }
+.talk svg { width: 28px; height: 28px; fill: none; stroke: var(--mic); stroke-width: 2; stroke-linecap: round; }
+.talk:disabled { opacity: .45; cursor: default; }
 
 /* presets */
 .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -269,12 +281,35 @@ a { color: inherit; }
 .d.host { background: var(--host); } .d.mic { background: var(--mic); } .d.ear { background: var(--ear); }
 .foot { margin-top: 18px; padding-top: 10px; border-top: 1px solid rgba(43,34,27,.25); font-size: 11px; color: #6c5c48; }
 
+.facts { padding-left: 18px; margin: 8px 0 0; font-size: 13px; }
+.facts li { margin-bottom: 6px; }
+
+/* handoff ticket */
+.handoff { border: 0; padding: 0; background: transparent; max-width: min(360px, calc(100vw - 32px)); }
+.handoff::backdrop { background: rgba(10, 6, 4, .72); backdrop-filter: blur(3px); }
+.ticket {
+  background: var(--paper); color: var(--paper-ink); padding: 22px 22px 18px; border-radius: 6px; text-align: center;
+  box-shadow: 0 24px 40px rgba(0,0,0,.5);
+  -webkit-mask: radial-gradient(circle 9px at 0 58%, transparent 98%, #000) , radial-gradient(circle 9px at 100% 58%, transparent 98%, #000);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+}
+.ticket-kicker { margin: 0; font: 700 11px var(--mono); letter-spacing: .3em; text-transform: uppercase; color: var(--orange); }
+.ticket h2 { font: 26px/1.1 Bungee, var(--mono); margin: 6px 0 6px; }
+.ticket-room { margin: 0 0 12px; font-size: 13px; overflow-wrap: anywhere; }
+.ticket-qr { width: 220px; height: 220px; margin: 0 auto; border: 2px dashed rgba(43,34,27,.35); padding: 6px; }
+.ticket-qr svg { width: 100%; height: 100%; display: block; }
+.ticket-note { font-size: 12px; margin: 12px 0 14px; }
+.ticket-actions { display: flex; gap: 8px; }
+.ticket-actions button { flex: 1; border: 2px solid var(--paper-ink); background: transparent; color: var(--paper-ink);
+  padding: 9px; border-radius: 3px; cursor: pointer; font-weight: 700; letter-spacing: .08em; }
+.ticket-actions .close { background: var(--paper-ink); color: var(--paper); }
+
 :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
 
 @media (max-width: 420px) {
   .shell { padding: 16px 14px 22px; }
   .stripes { margin: 0 -14px 14px; }
-  .deck { grid-template-columns: 1fr 112px; gap: 12px; }
+  .deck { grid-template-columns: minmax(0, 1fr) 112px; gap: 12px; }
   .knob { width: 88px; height: 88px; }
   .lcd-title { font-size: 30px; }
   .smile { right: -6px; bottom: -36px; width: 56px; height: 56px; font-size: 8px; }

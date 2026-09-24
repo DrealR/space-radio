@@ -85,10 +85,16 @@
           </div>
         </section>
 
-        <a id="ptt" class="ptt" href="#" target="spaces-radio" rel="noopener">
-          <span class="ribs" aria-hidden="true"></span>
-          <span class="ptt-label"><b id="ptt-text">PUSH TO JOIN</b><small id="ptt-sub">opens the room in X · listen or grab the mic</small></span>
-        </a>
+        <div class="ptt-row">
+          <a id="ptt" class="ptt" href="#" target="spaces-radio" rel="noopener">
+            <span class="ribs" aria-hidden="true"></span>
+            <span class="ptt-label"><b id="ptt-text">PUSH TO JOIN</b><small id="ptt-sub">opens the room in X</small></span>
+          </a>
+          <button id="mic" class="talk" type="button" aria-label="Talk: send this room to your phone" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+            <span>MIC</span>
+          </button>
+        </div>
 
         <div class="dymo" aria-hidden="true">PRESETS</div>
         <div id="presets" class="presets"></div>
@@ -104,7 +110,7 @@
       <ol class="steps">
         <li><b>BAND</b> picks what it's about. Rooms on the glass are live, and taller ones are busier.</li>
         <li><b>TUNE</b>: turn the knob, swipe the screen, or press ← →.</li>
-        <li><b>PUSH TO JOIN</b> opens the room in X (the app, on a phone). Listen, or request the mic.</li>
+        <li><b>PUSH TO LISTEN</b> opens the room in X. On a phone it's the X app, where you can also request the mic.</li>
         <li><b>SCAN</b> (on a computer) hops to a new room every few minutes while you work.</li>
       </ol>
 
@@ -121,11 +127,36 @@
 
       <h2>Reading the speaker</h2>
       <p class="legend"><i class="d host"></i> host <i class="d mic"></i> on the mic <i class="d ear"></i> listening</p>
-      <p>Every room plays inside X, so hosts keep their controls: they pick speakers and can mute, remove or block anyone.</p>
+      <p>X only counts people who are signed in, so the real crowd can be bigger than the grille.</p>
+
+      <h2>Listen, talk, lurk</h2>
+      <ul class="facts">
+        <li><b>Listen:</b> anyone, on a computer, even without an X account.</li>
+        <li><b>Talk:</b> needs an X account and the X phone app, because the web can only listen. On a computer, press <b>MIC</b> and scan the code with your phone to carry the room over.</li>
+        <li><b>Lurk:</b> X has anonymous listening if you'd rather not be seen in the room.</li>
+        <li>Every room plays inside X, so hosts keep their controls. They pick speakers and can mute, remove or block anyone.</li>
+      </ul>
+
+      <h2>Why this exists</h2>
+      <p>Built in the fall of 2026 by someone who spent the warm months playing guitar in the park, around people. Then winter came and work went remote. Scrolling posts isn't the same as hearing real voices.</p>
+      <p>Spaces are the closest thing online to a third place: real people, live, talking about what they care about, and anyone can speak up. This radio makes flipping through them as easy as flipping through a feed. It's company in the background while you work, and a door you can walk through when you feel like talking.</p>
 
       <footer id="foot" class="foot"></footer>
     </aside>
   </main>
+  <dialog id="handoff" class="handoff" aria-labelledby="handoff-title">
+    <div class="ticket">
+      <p class="ticket-kicker">Transmit to phone</p>
+      <h2 id="handoff-title">Scan to talk</h2>
+      <p id="handoff-room" class="ticket-room"></p>
+      <div id="handoff-qr" class="ticket-qr"></div>
+      <p class="ticket-note">Point your phone's camera at the code. The room opens in the X app, where you can request the mic.</p>
+      <div class="ticket-actions">
+        <button id="handoff-copy" type="button">Copy link</button>
+        <button id="handoff-close" type="button" class="close">Done</button>
+      </div>
+    </div>
+  </dialog>
   <script type="module" src="app.js"></script>
 </body>
 </html>
