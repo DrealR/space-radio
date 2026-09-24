@@ -1,0 +1,216 @@
+/* Crew manifest: a hologram the speaker projects. Styles only .crew, reading app.css's
+   :root tokens (with fallbacks for the new ones). The glass stays dark in light mode. */
+dialog.crew {
+  --holo-bg: rgba(4, 18, 15, .86);
+  --holo-solid: #04120f;
+  --holo-ink: #dffff3;
+  --holo-dim: rgba(223, 255, 243, .64);
+  --holo-line: rgba(109, 255, 200, .34);
+  --holo-glow: 0 0 28px rgba(109, 255, 200, .22);
+  --holo-vfd: var(--vfd, #6dffc8);
+  --holo-go: linear-gradient(#ff7a33, var(--orange, #f0661c));
+  border: 0; padding: 0; background: transparent; color: var(--holo-ink); color-scheme: dark;
+  font: 13px/1.5 var(--mono, ui-monospace, monospace);
+  width: var(--crew-w, 420px); max-width: calc(100vw - 32px); max-height: 86vh; overflow: visible;
+  margin: auto 0; right: auto;
+  left: clamp(16px, calc(var(--crew-x, 50vw) - var(--crew-w, 420px) / 2), calc(100vw - var(--crew-w, 420px) - 16px));
+}
+dialog.crew[open] { display: flex; flex-direction: column; }
+dialog.crew::backdrop { background: rgba(4, 6, 8, .72); }
+dialog.crew[open]::backdrop { animation: crew-fade .24s ease-out both; }
+dialog.crew.crew-closing::backdrop { animation: crew-unfade .18s ease-in both; }
+.crew [hidden] { display: none !important; }
+.crew .crew-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.crew-card {
+  position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--holo-solid); border: 1px solid var(--holo-line); border-radius: 16px;
+  box-shadow: var(--holo-glow), 0 24px 60px rgba(0, 0, 0, .55); transform-origin: 50% 100%;
+  animation: crew-rise .32s cubic-bezier(.2, .9, .25, 1) backwards, crew-flicker .07s steps(1) .32s 1;
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (min-width: 600px) {
+    .crew-card { background: var(--holo-bg); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); }
+  }
+}
+/* scanlines over everything, and one bright band that sweeps down as the hologram forms */
+.crew-card::before, .crew-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.crew-card::before { background: repeating-linear-gradient(rgba(109, 255, 200, .05) 0 1px, transparent 1px 3px); }
+.crew-card::after {
+  background: linear-gradient(transparent calc(50% - 1px), var(--holo-vfd) 50%, transparent calc(50% + 1px));
+  filter: drop-shadow(0 0 6px var(--holo-vfd)); opacity: 0; animation: crew-scan .42s ease-out .06s 1;
+}
+dialog.crew.crew-closing .crew-card { animation: crew-sink .18s ease-in both; }
+dialog.crew.crew-dropping .crew-card { animation: crew-drop .18s ease-in both; }
+
+.crew-grab { display: none; width: 36px; height: 4px; margin: 8px auto 0; border-radius: 2px; background: var(--holo-line); flex: none; }
+.crew-head { position: relative; flex: none; padding: 14px 64px 10px 18px; }
+.crew-kicker {
+  margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font: 17px/1 var(--lcd, monospace); letter-spacing: .08em; color: var(--holo-vfd);
+  text-shadow: 0 0 6px rgba(109, 255, 200, .55);
+}
+.crew-pill {
+  font: 700 9px/1 var(--mono, monospace); letter-spacing: .14em; padding: 3px 6px 2px; border-radius: 3px;
+  color: #1a0703; background: var(--onair, #ff4a2e); text-shadow: none; box-shadow: 0 0 10px rgba(255, 74, 46, .45);
+}
+.crew-pill.crew-pill-lined { background: var(--mustard, #f2b21a); box-shadow: 0 0 10px rgba(242, 178, 26, .35); }
+.crew-pill:empty { display: none; }
+.crew-title {
+  margin: 6px 0 4px; font: 700 19px/1.25 var(--mono, monospace); color: #fff; overflow-wrap: anywhere;
+  text-shadow: -1px 0 rgba(255, 90, 140, .28), 1px 0 rgba(90, 200, 255, .28);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.crew-meta { margin: 0; font: 17px/1.1 var(--lcd, monospace); letter-spacing: .06em; color: var(--holo-dim); }
+.crew-x {
+  position: absolute; top: 10px; right: 10px; width: 44px; height: 44px; display: grid; place-items: center;
+  border: 1px solid var(--holo-line); border-radius: 12px; background: rgba(109, 255, 200, .04);
+  color: var(--holo-ink); font-size: 18px; cursor: pointer;
+}
+.crew-status {
+  flex: none; margin: 0; padding: 7px 18px 6px; border-block: 1px solid var(--holo-line);
+  font: 19px/1.1 var(--lcd, monospace); letter-spacing: .08em; color: var(--holo-vfd);
+  text-shadow: 0 0 6px rgba(109, 255, 200, .55); background: rgba(109, 255, 200, .04);
+}
+.crew-body { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 12px 16px; }
+
+.crew-sec-title { margin: 14px 6px 6px; font: 400 16px/1 var(--lcd, monospace); letter-spacing: .14em; color: var(--holo-dim); }
+.crew-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.crew-hero, .crew-person {
+  display: grid; align-items: center; color: inherit; text-decoration: none;
+  border: 1px solid transparent; border-radius: 12px;
+  animation: crew-materialize .36s ease-out both; animation-delay: calc(var(--i, 0) * 30ms);
+}
+.crew-hero { grid-template-columns: 64px 1fr auto; gap: 14px; min-height: 84px; padding: 10px 12px; }
+.crew-person { grid-template-columns: 44px 1fr auto; gap: 12px; min-height: 56px; padding: 6px 10px; }
+.crew-hero:hover, .crew-person:hover, .crew-hero:focus-visible, .crew-person:focus-visible {
+  background: rgba(109, 255, 200, .08); border-color: var(--holo-vfd);
+}
+.crew a:focus-visible, .crew button:focus-visible { outline: 2px solid var(--holo-vfd); outline-offset: 2px; }
+
+.crew-av {
+  position: relative; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+  background: #0a1f19; box-shadow: 0 0 0 2px var(--mic, #7dff9a), 0 0 10px rgba(125, 255, 154, .3);
+}
+.crew-av-host, .crew-av-cohost { box-shadow: 0 0 0 2px var(--host, #ffb13b), 0 0 10px rgba(255, 177, 59, .3); }
+.crew-hero .crew-av {
+  width: 64px; height: 64px;
+  box-shadow: 0 0 0 2px var(--host, #ffb13b), 0 0 0 6px rgba(255, 177, 59, .14), 0 0 20px rgba(255, 177, 59, .35);
+}
+.crew-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.crew-glyph {
+  width: 100%; height: 100%; display: grid; place-items: center; color: #fff;
+  font: 28px/1 var(--lcd, monospace); text-shadow: 0 0 6px rgba(255, 255, 255, .4);
+}
+.crew-hero .crew-glyph { font-size: 40px; }
+
+.crew-who { min-width: 0; display: grid; gap: 4px; }
+.crew-name { font: 700 14px/1.2 var(--mono, monospace); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.crew-hero .crew-name { font-size: 17px; }
+.crew-line { min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--holo-dim); }
+.crew-handle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 16px/1 var(--lcd, monospace); letter-spacing: .03em; }
+.crew-hero .crew-handle { font-size: 18px; }
+.crew-role, .crew-lock {
+  flex: none; font: 700 9px/1 var(--mono, monospace); letter-spacing: .12em; padding: 3px 5px 2px; border-radius: 3px;
+}
+.crew-role { color: var(--mic, #7dff9a); border: 1px solid currentColor; }
+.crew-role-host, .crew-role-cohost { color: var(--host, #ffb13b); }
+.crew-lock { color: var(--holo-dim); border: 1px dashed var(--holo-line); }
+.crew-check { flex: none; color: var(--holo-vfd); font-weight: 700; }
+.crew-go { color: var(--holo-dim); font-size: 16px; padding-left: 4px; }
+/* ↗ ✓ ▸ drawn from the page's SVG sprite: the web fonts carry none of them */
+.crew .crew-g { width: .85em; height: .85em; display: inline-block; vertical-align: -.1em; flex: none; }
+
+.crew-ears { margin-top: 6px; }
+.crew-dots { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 6px; }
+.crew-dots i {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--ear, #f6e6c4); opacity: .8;
+  box-shadow: 0 0 5px rgba(246, 230, 196, .55);
+  animation: crew-materialize .4s ease-out both; animation-delay: calc(120ms + var(--d, 0) * 10ms);
+}
+.crew-ears-note { margin: 8px 6px 0; font-size: 11px; line-height: 1.45; color: var(--holo-dim); }
+
+.crew-note:empty { display: none; }
+.crew-note {
+  margin: 14px 2px 0; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  border: 1px dashed var(--holo-line); border-radius: 12px; background: rgba(109, 255, 200, .04);
+}
+.crew-note-body { margin: 0; flex: 1 1 100%; font-size: 13px; line-height: 1.5; }
+.crew-act, .crew-refresh {
+  min-height: 44px; padding: 0 16px; border-radius: 10px; cursor: pointer; background: transparent;
+  border: 1px solid var(--holo-vfd); color: var(--holo-vfd); font: 700 12px/1 var(--mono, monospace); letter-spacing: .12em;
+}
+.crew-act:disabled { opacity: .5; cursor: default; }
+
+/* while scanning: placeholder rows and a VFD line sweeping over them */
+.crew-skel { position: relative; overflow: hidden; list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px; }
+.crew-skel li { display: grid; grid-template-columns: 44px 1fr; grid-template-rows: auto auto; column-gap: 12px; row-gap: 8px; align-content: center; min-height: 56px; padding: 6px 10px; }
+.crew-skel i { grid-row: 1 / 3; width: 44px; height: 44px; border-radius: 50%; background: rgba(109, 255, 200, .1); }
+.crew-bar { height: 10px; width: 62%; border-radius: 3px; background: rgba(109, 255, 200, .1); align-self: end; }
+.crew-bar-short { width: 34%; align-self: start; }
+.crew-skel::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(transparent calc(50% - 12px), rgba(109, 255, 200, .16) calc(50% - 1px), var(--holo-vfd) 50%, transparent calc(50% + 1px));
+  animation: crew-sweep 1.2s linear infinite;
+}
+
+.crew-foot {
+  flex: none; display: grid; gap: 8px; padding: 12px 14px 14px; border-top: 1px solid var(--holo-line);
+  background: linear-gradient(rgba(4, 18, 15, .6), rgba(4, 18, 15, .96));
+}
+.crew-listen, .crew-openx {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-align: center;
+  min-height: 48px; padding: 8px 12px; border-radius: 12px; text-decoration: none; cursor: pointer;
+}
+.crew-listen { color: #fff; background: var(--holo-go); box-shadow: 0 4px 0 #8a300a, 0 8px 18px rgba(240, 102, 28, .25); }
+.crew-listen b { font: 16px/1 Bungee, var(--mono, monospace); letter-spacing: .02em; }
+.crew-listen small, .crew-openx small { font-size: 11px; line-height: 1.3; opacity: .88; }
+.crew-listen[aria-disabled="true"] { filter: grayscale(.8) brightness(.8); cursor: default; }
+.crew-listen:active, .crew-foot[data-lead="openx"] .crew-openx:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a300a; }
+.crew-openx { color: var(--holo-ink); border: 1.5px solid var(--x-turn, #8f73ff); box-shadow: inset 0 0 14px rgba(143, 115, 255, .22); }
+.crew-openx b { font: 700 14px/1 var(--mono, monospace); letter-spacing: .12em; }
+.crew-openx small { color: var(--holo-dim); }
+/* when the radio can't help, X's own page becomes the big button */
+.crew-foot[data-lead="openx"] .crew-openx {
+  order: -1; color: #fff; border-color: transparent; background: var(--holo-go);
+  box-shadow: 0 4px 0 #8a300a, 0 8px 18px rgba(240, 102, 28, .25);
+}
+.crew-foot[data-lead="openx"] .crew-openx small { color: #fff; }
+.crew-foot[data-lead="openx"] .crew-listen { background: transparent; border: 1px solid var(--holo-line); box-shadow: none; }
+.crew-fine {
+  margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font: 16px/1 var(--lcd, monospace); letter-spacing: .06em; color: var(--holo-dim);
+}
+.crew-refresh { min-height: 36px; padding: 0 12px; font-size: 11px; }
+.crew-tip { margin: 0; font-size: 11px; text-align: center; color: var(--holo-dim); }
+
+/* phones: a bottom sheet with a grab bar that follows the finger */
+@media (max-width: 599.98px) {
+  dialog.crew {
+    inset: auto 0 0 0; margin: 0; width: 100%; max-width: 100%; max-height: 88vh; max-height: 88dvh;
+  }
+  .crew-card { border-radius: 18px 18px 0 0; border-bottom: 0; }
+  .crew-grab { display: block; }
+  .crew-grab, .crew-head { touch-action: none; }
+  .crew-foot { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); }
+  .crew-refresh { min-height: 44px; }
+  .crew-act { flex: 1 1 auto; }
+}
+
+@keyframes crew-fade { from { opacity: 0; } }
+@keyframes crew-unfade { to { opacity: 0; } }
+@keyframes crew-rise { from { transform: scaleY(.02); opacity: 0; } 55% { opacity: 1; } to { transform: none; opacity: 1; } }
+@keyframes crew-flicker { 0% { opacity: .55; } 50%, 100% { opacity: 1; } }
+@keyframes crew-scan { from { transform: translateY(-50%); opacity: 1; } to { transform: translateY(50%); opacity: 0; } }
+@keyframes crew-materialize { from { opacity: 0; filter: blur(4px); transform: translateY(6px); } }
+@keyframes crew-sweep { from { transform: translateY(-50%); } to { transform: translateY(50%); } }
+@keyframes crew-sink { from { transform: none; opacity: 1; } to { transform: scaleY(.02); opacity: 0; } }
+@keyframes crew-drop { to { transform: translateY(100%); opacity: .3; } }
+
+/* reduced motion: a short fade, then everything in its final place */
+@media (prefers-reduced-motion: reduce) {
+  .crew-card { animation: crew-fade .12s ease-out both; }
+  .crew-card::after, .crew-skel::after { animation: none; display: none; }
+  .crew-hero, .crew-person, .crew-dots i, dialog.crew[open]::backdrop { animation: none; }
+  dialog.crew.crew-closing .crew-card, dialog.crew.crew-dropping .crew-card { animation: none; }
+}

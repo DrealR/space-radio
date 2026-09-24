@@ -23,6 +23,8 @@
   --mic: #7dff9a;
   --ear: #f6e6c4;
   --off: #3a302a;
+  --x-turn: #8f73ff;  /* violet: X's turn (its Start listening button) */
+  --onair: #ff4a2e;   /* red: on air */
   --mono: "Space Mono", ui-monospace, monospace;
   --lcd: "VT323", ui-monospace, monospace;
 }
@@ -161,6 +163,11 @@ a { color: inherit; }
   background: radial-gradient(circle at 35% 35%, #fff, #b9b2a8 55%, #6f685f); }
 .radio.live .antenna i { box-shadow: 0 0 0 0 rgba(240,102,28,.7); animation: beacon 2.2s ease-out infinite; }
 @keyframes beacon { 70% { box-shadow: 0 0 0 16px rgba(240,102,28,0); } 100% { box-shadow: 0 0 0 0 rgba(240,102,28,0); } }
+/* X's turn: a violet tip over the plain one, blinked with opacity only (off, then on: 1 Hz) */
+.antenna i::after { content: ""; position: absolute; inset: 0; border-radius: 50%; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle at 35% 35%, #fff, var(--x-turn) 55%, #3b2c86); box-shadow: 0 0 12px var(--x-turn); }
+.radio.in-airlock .antenna i::after { animation: xblink 1s step-end infinite; }
+@keyframes xblink { 50% { opacity: 1; } }
 
 .shell {
   position: relative; border-radius: 34px 34px 40px 40px; padding: 20px 20px 26px;
@@ -181,7 +188,10 @@ a { color: inherit; }
 .lamp::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #5b3a2c;
   box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
 .lamp.rx.on::before { background: #7dff9a; box-shadow: 0 0 10px #7dff9a, inset 0 -1px 2px rgba(0,0,0,.3); animation: blink 1.1s steps(2) infinite; }
-.lamp.air.on::before { background: #ff4a2e; box-shadow: 0 0 12px #ff4a2e, inset 0 -1px 2px rgba(0,0,0,.3); }
+.lamp.air.on::before { background: var(--onair); box-shadow: 0 0 12px var(--onair), inset 0 -1px 2px rgba(0,0,0,.3); }
+.lamp.air.stby { color: #9a6a12; }
+.lamp.air.stby::before { background: var(--host); box-shadow: 0 0 10px var(--host), inset 0 -1px 2px rgba(0,0,0,.3);
+  animation: blink 1.2s steps(2) infinite; }
 @keyframes blink { 50% { opacity: .35; } }
 
 .stripes { display: grid; gap: 3px; margin: 0 -20px 16px; position: relative; }
@@ -267,13 +277,25 @@ a { color: inherit; }
 
 /* speaker + controls */
 .deck { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 16px; margin-top: 20px; }
-.speaker { background: var(--panel); border-radius: 18px; padding: 14px 12px 10px;
+.speaker-col { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+.speaker { display: block; position: relative; width: 100%; border: 0; font: inherit; color: inherit; cursor: pointer;
+  text-align: center; background: var(--panel); border-radius: 18px; padding: 14px 12px 10px;
   box-shadow: inset 0 3px 10px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.6); }
+.speaker::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 2px rgba(255,177,59,.55); opacity: 0; transition: opacity .2s; }
+.speaker:disabled { cursor: default; }
+.speaker:not(:disabled):is(:hover, :focus-visible)::after { opacity: 1; }
+.speaker:not(:disabled):is(:hover, :focus-visible) .grille :is(.host, .mic, .ear) { filter: brightness(1.2); }
+.speaker-cta { display: block; margin-top: 4px; font: 700 11px/1.3 var(--mono); letter-spacing: .14em; color: var(--host);
+  text-shadow: 0 0 8px rgba(255,177,59,.45); }
+.speaker:disabled .speaker-cta { visibility: hidden; }
 .grille { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; }
 .grille i { aspect-ratio: 1; border-radius: 50%; background: #120e0b; box-shadow: inset 0 2px 3px rgba(0,0,0,.9); transition: background .4s, box-shadow .4s; }
 .grille i.ear { background: var(--ear); box-shadow: 0 0 5px rgba(246,230,196,.55); opacity: .75; }
-.grille i.mic { background: var(--mic); box-shadow: 0 0 8px var(--mic); animation: talk 1.6s ease-in-out infinite; }
-.grille i.host { background: var(--host); box-shadow: 0 0 10px var(--host); animation: talk 2.1s ease-in-out infinite; }
+.grille i.mic { background: var(--mic); box-shadow: 0 0 8px var(--mic); }
+.grille i.host { background: var(--host); box-shadow: 0 0 10px var(--host); }
+.radio.live .grille i.mic { animation: talk 1.6s ease-in-out var(--td, 0ms) infinite; }
+.radio.live .grille i.host { animation: talk 2.1s ease-in-out var(--td, 0ms) infinite; }
 @keyframes talk { 0%,100% { transform: scale(.85); } 30% { transform: scale(1.12); } 60% { transform: scale(.95); } }
 .grille-key { margin-top: 8px; font-size: 10px; color: #bfae94; letter-spacing: .06em; text-align: center; min-height: 1.4em; }
 
@@ -307,7 +329,7 @@ a { color: inherit; }
 .toggles .sfx { grid-column: 1 / -1; }
 
 /* push to talk */
-.ptt-row { display: flex; gap: 10px; margin-top: 20px; }
+.ptt-row { display: flex; gap: 10px; margin-top: 10px; }
 .ptt {
   flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 16px;
@@ -317,11 +339,13 @@ a { color: inherit; }
 }
 .ptt:active, .ptt.pressed { transform: translateY(5px); box-shadow: 0 2px 0 #8a300a, 0 4px 6px rgba(0,0,0,.35); }
 .ptt.off { filter: grayscale(.8) brightness(.9); pointer-events: none; }
-.ptt.pending { animation: nudge 1.4s ease-in-out infinite; }
-@keyframes nudge { 50% { box-shadow: 0 7px 0 #8a300a, 0 0 0 6px rgba(242,178,26,.55), 0 12px 16px rgba(0,0,0,.35); } }
+.ptt.breathe::after { content: ""; position: absolute; inset: -6px; border-radius: 21px; pointer-events: none;
+  border: 3px solid rgba(240,102,28,.6); opacity: .55; animation: breathe 2.4s ease-in-out infinite; }
+@keyframes breathe { 0%, 100% { opacity: .1; transform: scale(.985); } 50% { opacity: .85; transform: scale(1.01); } }
 .ribs { width: 34px; height: 40px; flex: none; border-radius: 6px;
   background: repeating-linear-gradient(180deg, rgba(0,0,0,.28) 0 3px, rgba(255,255,255,.18) 3px 6px); }
-.ptt-label { display: flex; flex-direction: column; }
+.ptt-label { display: flex; flex-direction: column; min-width: 0; }
+.ptt-label .g { width: .8em; height: .8em; vertical-align: -.04em; }
 .ptt-label b { font: 20px/1 Bungee, var(--mono); letter-spacing: .02em; }
 .ptt-label small { font-size: 11px; opacity: .9; margin-top: 5px; }
 
@@ -385,6 +409,7 @@ a { color: inherit; }
 .d { width: 11px; height: 11px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.4); }
 .d.host { background: var(--host); } .d.mic { background: var(--mic); } .d.ear { background: var(--ear); }
 .foot { margin-top: 18px; padding-top: 10px; border-top: 1px solid rgba(43,34,27,.25); font-size: 11px; color: #6c5c48; }
+.foot p { margin: 0; font-size: 11px; }
 
 .facts { padding-left: 18px; margin: 8px 0 0; font-size: 13px; }
 .facts li { margin-bottom: 6px; }
@@ -409,18 +434,188 @@ a { color: inherit; }
   padding: 9px; border-radius: 3px; cursor: pointer; font-weight: 700; letter-spacing: .08em; }
 .ticket-actions .close { background: var(--paper-ink); color: var(--paper); }
 
+/* ---------- the two-key launch ---------- */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.g { width: .85em; height: .85em; display: inline-block; vertical-align: -.1em; flex: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.phone-only { display: none; }
+[data-kind="phone"] .phone-only { display: inline; }
+[data-kind="phone"] .desk-only { display: none !important; }
+
+/* rail: 1 your move (orange) — 2 X's turn (violet) — 3 on air (red) */
+.rail { display: flex; align-items: center; gap: 6px; margin: 18px 4px 0; font: 700 9px/1.2 var(--mono);
+  letter-spacing: .06em; color: #6c5c48; white-space: nowrap; }
+.rail-step { display: inline-flex; align-items: center; gap: 5px; }
+.rail-line { flex: 1; min-width: 6px; height: 1px; background: rgba(108,92,72,.45); }
+.rail-lamp { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #5b3a2c; box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
+.rail-step:nth-of-type(1) { --lit: var(--orange); }
+.rail-step:nth-of-type(2) { --lit: var(--x-turn); }
+.rail-step:nth-of-type(3) { --lit: var(--onair); }
+.rail-lamp:is([data-state="on"], [data-state="blink"]) { background: var(--lit); box-shadow: 0 0 7px var(--lit); }
+.rail-lamp[data-state="blink"] { animation: blink 1.2s steps(2) infinite; }
+
+/* the airlock: X's turn, taught at the moment it matters */
+.airlock { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease-out; }
+.airlock.open { grid-template-rows: 1fr; }
+/* No padding here: a grid item's padding would keep 0fr from closing. Its own overflow clips the card's margin. */
+.airlock-in { overflow: hidden; min-height: 0; }
+.airlock-card { position: relative; margin-top: 14px; padding: 10px 14px 12px; border-radius: 12px; font-family: var(--lcd); color: var(--vfd);
+  background: var(--vfd-bg); text-shadow: 0 0 6px rgba(109,255,200,.5);
+  box-shadow: inset 0 0 0 3px #0b0806, inset 0 6px 16px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.6); }
+.airlock-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); }
+.airlock-kicker { margin: 0 0 6px; font-size: 19px; line-height: 1.1; letter-spacing: .05em; }
+.airlock-body, .airlock-steps, .why p, .airlock-note { font: 12.5px/1.5 var(--mono); color: #cfeee2; text-shadow: none; }
+.airlock-body { margin: 0 0 10px; }
+.airlock-note { margin: 0 0 10px; color: var(--host); }
+.airlock-steps { margin: 0 0 10px; padding-left: 20px; }
+.airlock-steps li { margin-bottom: 6px; }
+.airlock-steps .chip { display: flex; width: max-content; max-width: 100%; margin-top: 5px; }
+.why { margin: -4px 0 10px; font-family: var(--mono); }
+.why summary { cursor: pointer; font: 700 11px var(--mono); letter-spacing: .08em; color: var(--vfd); width: max-content; }
+.why p { margin: 4px 0 0; }
+.force { display: inline-block; margin: 0 0 10px; font: 12px var(--mono); color: var(--vfd); }
+.x-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 11px 3px 9px; border-radius: 999px;
+  background: var(--x-turn); color: #fff; font: 700 12px/1.3 var(--mono); text-shadow: none; white-space: nowrap;
+  vertical-align: 1px; box-shadow: 0 0 12px rgba(143,115,255,.45); }
+.x-pill .g { width: .75em; height: .75em; vertical-align: 0; }
+.x-pill.small { padding: 0 8px 0 6px; font-size: 11px; box-shadow: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 12px;
+  border: 1px solid rgba(109,255,200,.34); border-radius: 8px; background: rgba(109,255,200,.06); color: var(--vfd);
+  font: 700 11px/1.1 var(--mono); letter-spacing: .08em; text-decoration: none; text-shadow: none; cursor: pointer; }
+.chip:hover, .chip:focus-visible { background: rgba(109,255,200,.14); border-color: var(--vfd); }
+.chip.primary { background: var(--vfd); border-color: var(--vfd); color: var(--vfd-bg); box-shadow: 0 0 12px rgba(109,255,200,.4); }
+.chip.primary:hover, .chip.primary:focus-visible { background: #a4ffdc; }
+.chip.out { border-color: var(--x-turn); }
+.chip:focus-visible { outline: 2px solid var(--vfd); outline-offset: 2px; }
+[data-kind="phone"] .chip { min-height: 44px; }
+.airlock-card.compact { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.airlock-card.compact > * { margin: 0; }
+
+/* the free way to X: a label-maker strip with X's violet edge */
+.open-x { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 4px 11px 3px; border-radius: 2px;
+  background: #141414; color: #f3f3f3; font: 700 10px/1.5 var(--mono); letter-spacing: .2em; text-decoration: none;
+  transform: rotate(-1.2deg); box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 0 0 1px var(--x-turn); }
+.open-x:hover { box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 0 0 2px var(--x-turn); }
+[data-kind="phone"] .open-x { min-height: 44px; }
+.order { width: 100%; display: flex; flex-direction: column; align-items: center; }
+.order .dymo.small { margin: 0 0 6px; transform: rotate(-1deg); }
+
+/* hailing: the needle trembles, the dots step, the antenna turns X-violet */
+.radio.hailing .needle { animation: tremble .16s steps(2) infinite; }
+@keyframes tremble { 50% { transform: translateX(1.5px); } 100% { transform: translateX(-1.5px); } }
+.dots i { font-style: normal; animation: dotstep 1s steps(1) infinite; }
+.dots i:nth-child(2) { animation-delay: .25s; }
+.dots i:nth-child(3) { animation-delay: .5s; }
+@keyframes dotstep { 0%, 74% { opacity: 1; } 75%, 100% { opacity: .15; } }
+
+/* signal lock: flare, bars, the tube lamp, a ripple through the crowd (700 ms) */
+.radio.locking .lcd { animation: flare .22s ease-out; }
+@keyframes flare { from { filter: brightness(1.8); } to { filter: brightness(1); } }
+.radio.locking .signal i { background: var(--vfd); box-shadow: 0 0 5px var(--vfd); animation: barfill .3s steps(1) both; }
+.radio.locking .signal i:nth-child(2) { animation-delay: 60ms; }
+.radio.locking .signal i:nth-child(3) { animation-delay: 120ms; }
+.radio.locking .signal i:nth-child(4) { animation-delay: 180ms; }
+.radio.locking .signal i:nth-child(5) { animation-delay: 240ms; }
+@keyframes barfill { from { opacity: .3; } to { opacity: 1; } }
+.radio.locking .lamp.air::before { animation: tube .5s steps(5) 120ms both; }
+@keyframes tube { 0% { opacity: .2; } 30% { opacity: 1; } 45% { opacity: .35; } 100% { opacity: 1; } }
+.radio.locking .grille i:is(.host, .mic, .ear, *) { animation: ripple .38s ease-out calc(150ms + var(--rd, 0ms)) both; }
+@keyframes ripple { 40% { transform: scale(1.35); filter: brightness(1.8); } }
+
+/* on air: a carrier line, and a red diamond over the room you hear */
+.carrier { position: absolute; left: 0; bottom: 3px; width: calc(100% + 40px); height: 6px; opacity: 0; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='6'%3E%3Cpath d='M0 3Q5 .5 10 3T20 3T30 3T40 3' fill='none' stroke='%236dffc8' stroke-width='1'/%3E%3C/svg%3E") repeat-x;
+  transition: opacity .4s; }
+.radio.live .carrier { opacity: .35; animation: carrier 2.4s linear infinite; }
+@keyframes carrier { to { transform: translateX(-40px); } }
+.markers button.playing::after { content: ""; position: absolute; left: 50%; top: -10px; width: 7px; height: 7px; margin-left: -3.5px;
+  background: var(--onair); transform: rotate(45deg); box-shadow: 0 0 8px var(--onair); }
+.markers button.ended { background: linear-gradient(#77706a, #4c4540); opacity: .45; }
+
+/* docked: a glowing seam on the side X sits */
+.shell::before, .shell::after { content: ""; position: absolute; top: 44px; bottom: 44px; width: 3px; border-radius: 2px;
+  background: var(--vfd); box-shadow: 0 0 12px var(--vfd), 0 0 2px #fff; opacity: 0; transition: opacity .4s; pointer-events: none; }
+.shell::before { left: -2px; }
+.shell::after { right: -2px; }
+.radio.docked-left .shell::before, .radio.docked-right .shell::after { opacity: 1; }
+.dock-tag { position: absolute; top: 34px; left: 18px; padding: 2px 8px 1px; background: #141414; color: var(--vfd);
+  font: 700 9px/1.5 var(--mono); letter-spacing: .22em; border-radius: 2px; transform: rotate(-2deg); opacity: 0;
+  transition: opacity .4s; pointer-events: none; }
+.radio:is(.docked-left, .docked-right) .dock-tag { opacity: 1; }
+
+/* lost: a burst of VFD snow */
+.lcd::before { content: ""; position: absolute; inset: -6px; opacity: 0; pointer-events: none; z-index: 1;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .43 0 0 0 0 1 0 0 0 0 .78 0 0 0 1.6 -.4'/%3E%3C/filter%3E%3Crect width='120' height='60' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.lcd.snow::before { animation: snow .7s steps(7) both; }
+@keyframes snow { 0% { opacity: .95; transform: translate(0, 0); } 30% { transform: translate(-5px, 3px); }
+  60% { opacity: .7; transform: translate(4px, -2px); } 100% { opacity: 0; transform: translate(-3px, 1px); } }
+
+/* phone: the one-time preflight sheet, and the in-app browser note */
+.sheet { border: 0; padding: 0; background: transparent; width: 100%; max-width: 520px; margin: auto auto 0; max-height: 88dvh; }
+.sheet::backdrop { background: rgba(10, 6, 4, .72); }
+.sheet-card { background: var(--paper); color: var(--paper-ink); border-radius: 18px 18px 0 0;
+  padding: 22px 20px calc(env(safe-area-inset-bottom) + 18px); box-shadow: 0 -12px 30px rgba(0,0,0,.4); }
+.sheet-card p { font-size: 14px; margin: 0 0 6px; }
+.sheet-kicker { font: 700 11px var(--mono); letter-spacing: .3em; color: var(--orange); }
+.sheet h2 { font: 24px/1.1 Bungee, var(--mono); margin: 4px 0 14px; }
+.two-keys { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 14px; padding: 0;
+  font: 700 11px var(--mono); letter-spacing: .04em; }
+.two-keys li { display: inline-flex; align-items: center; gap: 5px; }
+.two-keys li + li::before { content: ""; width: 10px; height: 1px; margin-right: 1px; background: currentColor; opacity: .5; }
+.two-keys .x-pill { font-size: 11px; padding: 3px 9px 3px 7px; }
+.two-keys .k1 { padding: 4px 9px; border-radius: 6px; background: var(--orange); color: #fff; }
+.two-keys .k3 i { width: 9px; height: 9px; border-radius: 50%; background: var(--onair); box-shadow: 0 0 8px var(--onair); }
+.sheet-actions { display: flex; gap: 10px; margin-top: 16px; }
+.go { flex: 1; display: grid; place-items: center; min-height: 50px; border-radius: 12px; text-decoration: none; color: #fff;
+  font: 18px/1 Bungee, var(--mono); background: linear-gradient(#ff7a33, #d9500f); box-shadow: 0 5px 0 #8a300a; }
+.not-now { min-height: 50px; padding: 0 16px; border: 2px solid var(--paper-ink); border-radius: 12px; background: none;
+  color: var(--paper-ink); font-weight: 700; cursor: pointer; }
+.inapp { display: flex; align-items: center; gap: 8px; width: min(440px, calc(100% - 32px)); margin: 14px auto 0;
+  padding: 8px 6px 8px 14px; border-radius: 6px; background: var(--paper); color: var(--paper-ink); font-size: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.35); }
+.inapp p { margin: 0; flex: 1; }
+.inapp button { min-width: 44px; min-height: 44px; border: 0; background: none; color: inherit; font-size: 16px; cursor: pointer; }
+
+/* manual extras */
+.motto { font-weight: 700; }
+.keys kbd { display: inline-block; min-width: 1.6em; padding: 0 4px; border: 1px solid rgba(43,34,27,.5); border-bottom-width: 2px;
+  border-radius: 3px; background: #fffaf0; font: 700 11px/1.5 var(--mono); text-align: center; }
+.tips-again { margin-top: 8px; padding: 6px 0; border: 0; background: none; color: var(--paper-ink); font-size: 11px;
+  text-decoration: underline; cursor: pointer; }
+.manual.lit { animation: lit 1.6s ease-out; }
+@keyframes lit { 20% { filter: drop-shadow(0 0 14px rgba(240,102,28,.9)); } }
+
 :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+
+/* Phones: the launch (rail, PUSH, airlock) sits right under the bands, inside the first screen;
+   the speaker and presets follow. Stickers are absolutely placed, so order doesn't touch them. */
+[data-kind="phone"] .desk { padding-top: 16px; }
+[data-kind="phone"] .radio { padding-top: 52px; }
+[data-kind="phone"] .antenna { height: 76px; }
+[data-kind="phone"] .shell { display: flex; flex-direction: column; }
+[data-kind="phone"] .shell > .dymo { align-self: flex-start; }
+[data-kind="phone"] .shell > :is(.rail, .ptt-row, .airlock) { order: 1; }
+[data-kind="phone"] .shell > :is(.deck, .presets-label, .presets) { order: 2; }
 
 @media (max-width: 420px) {
   .shell { padding: 16px 14px 22px; }
+  .rail { letter-spacing: 0; gap: 4px; }
+  .ptt { gap: 10px; padding: 14px 14px; }
+  .ribs { width: 24px; }
+  .ptt-label b { font-size: 17px; }
   .stripes { margin: 0 -14px 14px; }
   .deck { grid-template-columns: minmax(0, 1fr) 112px; gap: 12px; }
   .knob { width: 88px; height: 88px; }
   .lcd-title { font-size: 30px; }
   .smile { right: -6px; bottom: -36px; width: 56px; height: 56px; font-size: 8px; }
   .ufo { left: -10px; width: 50px; height: 50px; }
+  [data-kind="phone"] .ufo { top: 64%; } /* beside the speaker, clear of the rail's "1 TAP" */
   .ufo svg { width: 42px; height: 42px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+  .radio.in-airlock .antenna i::after { opacity: 1; } /* X's turn still shows, just without the blink */
 }

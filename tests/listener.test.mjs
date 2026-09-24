@@ -1,42 +1,60 @@
-// node --test tests/*.mjs — reaching the X window without ever playing two rooms at once.
+// node --test tests/*.mjs — one press, one plan; the dial never touches X.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ISOLATION_MS, planJoin, readWindow } from "../public/js/listener.js";
-import { joinCopy } from "../public/js/handoff.js";
+import { ISOLATION_MS, planPush, readWindow } from "../public/js/listener.js";
 
-test("phone: the link opens the app on a push; flipping alone waits", () => {
-  assert.equal(planJoin({ phone: true, steer: "unknown", windowAlive: false, gesture: true }), "open-link");
-  assert.equal(planJoin({ phone: true, steer: "unknown", windowAlive: false, gesture: false }), "pending");
+const desk = (patch) => planPush({ kind: "desktop", phase: "idle", sameRoom: false, alive: false, blocked: false, ...patch });
+
+test("phone: the button is always its own same-tab link", () => {
+  for (const phase of ["idle", "away", "back", "onair"]) {
+    assert.equal(planPush({ kind: "phone", phase, sameRoom: true, alive: false, blocked: false }), "link");
+  }
 });
 
-test("computer: steer when X lets us, otherwise only a push opens a window", () => {
-  assert.equal(planJoin({ phone: false, steer: "yes", windowAlive: true, gesture: false }), "steer");
-  assert.equal(planJoin({ phone: false, steer: "no", windowAlive: false, gesture: false }), "pending");
-  assert.equal(planJoin({ phone: false, steer: "no", windowAlive: false, gesture: true }), "open");
-  assert.equal(planJoin({ phone: false, steer: "unknown", windowAlive: true, gesture: false }), "pending");
-  assert.equal(planJoin({ phone: false, steer: "yes", windowAlive: false, gesture: true }), "open");
+test("blocked pop-ups turn the button into a plain new-tab link", () => {
+  assert.equal(desk({ blocked: true }), "newtab");
+  assert.equal(desk({ blocked: true, phase: "onair", sameRoom: true, alive: true }), "newtab");
 });
 
-test("a window that vanishes at once means X cut us off, not that you left", () => {
+test("same room: bring our X window forward, never reload or open a second", () => {
+  for (const phase of ["airlock", "onair"]) {
+    assert.equal(desk({ phase, sameRoom: true, alive: true }), "focus");
+    assert.equal(desk({ phase, sameRoom: true, alive: false }), "remind");
+  }
+});
+
+test("another room: steer the X window we hold, else open a fresh one", () => {
+  for (const phase of ["airlock", "onair", "lost"]) {
+    assert.equal(desk({ phase, alive: true }), "steer");
+    assert.equal(desk({ phase, alive: false }), "open");
+  }
+  assert.equal(desk({ phase: "idle", alive: true }), "open");
+  assert.equal(desk({ phase: "lost", sameRoom: true, alive: false }), "open");
+});
+
+test("a window that vanishes at once was cut off by X, not closed by you", () => {
   const t = 10_000;
-  assert.deepEqual(readWindow({ steer: "unknown", openedAt: t, now: t + 500, alive: false }),
-                   { steer: "no", userClosed: false });
+  assert.equal(readWindow({ handle: "unknown", openedAt: t, now: t + 500, alive: false }), "cut");
+  assert.equal(readWindow({ handle: "unknown", openedAt: t, now: t + 500, alive: true }), null);
 });
 
-test("a window still reachable after the grace period can be steered; closing it later ends listening", () => {
+test("still reachable after the grace period means kept; gone later means closed", () => {
   const t = 10_000;
-  assert.deepEqual(readWindow({ steer: "unknown", openedAt: t, now: t + 500, alive: true }),
-                   { steer: "unknown", userClosed: false });
-  assert.deepEqual(readWindow({ steer: "unknown", openedAt: t, now: t + ISOLATION_MS + 1, alive: true }),
-                   { steer: "yes", userClosed: false });
-  assert.deepEqual(readWindow({ steer: "yes", openedAt: t, now: t + 60_000, alive: false }),
-                   { steer: "yes", userClosed: true });
+  const later = t + ISOLATION_MS;
+  assert.equal(readWindow({ handle: "unknown", openedAt: t, now: later, alive: true }), "kept");
+  assert.equal(readWindow({ handle: "kept", openedAt: t, now: later + 60_000, alive: true }), null);
+  assert.equal(readWindow({ handle: "kept", openedAt: t, now: later + 60_000, alive: false }), "closed");
+  assert.equal(readWindow({ handle: "unknown", openedAt: t, now: later, alive: false }), "cut");
+  assert.equal(readWindow({ handle: "cut", openedAt: t, now: later, alive: false }), null);
+  assert.equal(readWindow({ handle: "none", openedAt: t, now: later, alive: false }), null);
 });
 
-test("button words follow what's on air", () => {
-  assert.equal(joinCopy({ phone: false, listening: true, here: false }).text, "PUSH TO SWITCH");
-  assert.match(joinCopy({ phone: false, listening: true, here: false }).sub, /close the old one/);
-  assert.match(joinCopy({ phone: false, listening: true, here: true, steer: "yes" }).sub, /follows the dial/);
-  assert.match(joinCopy({ phone: false, listening: true, here: true, steer: "no" }).sub, /your X tab/);
-  assert.equal(joinCopy({ phone: true, listening: true, here: false }).text, "PUSH TO SWITCH");
+test("a slow X page is never mistaken for a kept window, or its loss for a closed one", () => {
+  const t = 10_000;
+  const later = t + ISOLATION_MS + 5000;
+  // Still on the blank page every pop-up starts with: not ours to keep yet.
+  assert.equal(readWindow({ handle: "unknown", openedAt: t, now: later, alive: true, committed: false }), null);
+  assert.equal(readWindow({ handle: "unknown", openedAt: t, now: later, alive: true, committed: true }), "kept");
+  // Gone before we ever kept it: X cut us off as its page arrived, whatever the age.
+  assert.equal(readWindow({ handle: "unknown", openedAt: t, now: later, alive: false, committed: false }), "cut");
 });

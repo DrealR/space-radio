@@ -15,7 +15,7 @@ import urllib.request
 from typing import Callable, Protocol
 
 from .budget import Budget
-from .space import Space, parse_space_id
+from .space import Space, non_negative_int, parse_space_id
 
 SEARCH_URL = "https://api.x.com/2/spaces/search"
 # host_ids / speaker_ids are plain id lists on the Space (no user lookups, no extra cost).
@@ -61,21 +61,31 @@ class XApiSource:
         hit = self._cache.get(topic)
         if hit and self._now() - hit[0] < self._ttl:
             return hit[1]
-        if not self._budget.can_afford(self._max):
+        # Hold the worst case before asking, so requests arriving together can't all pass the cap.
+        held = self._budget.try_reserve(self._max, tag="search")
+        if held is None:
             raise SourceError("Today's X budget is used up; rooms people pasted still play.")
+        try:
+            body = self._search(topic)
+        except BaseException:
+            self._budget.release(held)
+            raise
+        data = body.get("data") if isinstance(body, dict) else None
+        spaces = [s for s in (_to_space(d, topic) for d in (data if isinstance(data, list) else [])) if s]
+        self._budget.settle(held, [s.id for s in spaces])
+        self._cache = {**self._cache, topic: (self._now(), spaces)}
+        return spaces
+
+    def _search(self, topic: str):
         query = urllib.parse.urlencode({
             "query": topic, "state": "live", "max_results": self._max, "space.fields": FIELDS,
         })
         try:
-            body = self._fetch(f"{SEARCH_URL}?{query}", self._token)
+            return self._fetch(f"{SEARCH_URL}?{query}", self._token)
         except urllib.error.HTTPError as err:
             raise SourceError(_explain_http(err.code)) from err
         except (urllib.error.URLError, TimeoutError, ValueError) as err:
             raise SourceError(f"Couldn't reach X ({err}).") from err
-        spaces = [s for s in (_to_space(d, topic) for d in body.get("data") or []) if s]
-        self._budget.charge(s.id for s in spaces)
-        self._cache = {**self._cache, topic: (self._now(), spaces)}
-        return spaces
 
 
 def _explain_http(code: int) -> str:
@@ -88,22 +98,32 @@ def _explain_http(code: int) -> str:
 
 
 def _to_space(item: dict, topic: str) -> Space | None:
+    if not isinstance(item, dict):
+        return None
     space_id = parse_space_id(str(item.get("id", "")))
     if not space_id or item.get("is_ticketed"):
         return None
     if item.get("state", "live") != "live":
         return None
+    host_ids = _unique_ids(item.get("host_ids"))
     return Space(
         id=space_id,
         title=str(item.get("title") or "Untitled room")[:200],
-        listeners=int(item.get("participant_count") or 0),
-        speakers=len(item.get("speaker_ids") or []),
-        hosts=len(item.get("host_ids") or []),
+        listeners=non_negative_int(item.get("participant_count")),
+        # A host on the mic is still one person: speakers are the others at the mic.
+        speakers=len(_unique_ids(item.get("speaker_ids")) - host_ids),
+        hosts=len(host_ids),
         started_at=str(item.get("started_at") or ""),
         lang=str(item.get("lang") or ""),
         topic=topic,
         source="x-api",
     )
+
+
+def _unique_ids(raw) -> frozenset:
+    if not isinstance(raw, list):
+        return frozenset()
+    return frozenset(str(i) for i in raw if isinstance(i, (str, int)) and not isinstance(i, bool))
 
 
 def gather(sources: list[SpaceSource], topic: str) -> tuple[list[Space], list[str]]:

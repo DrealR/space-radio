@@ -101,3 +101,18 @@ test("English-only keeps en, other and unknown; drops other languages", async ()
   assert.equal(onlyEnglish(rooms, false).length, rooms.length);
   assert.deepEqual(["en", "other", "", "ja"].map(langLabel), ["EN", "", "", "JA"]);
 });
+
+test("space links: canonical, /peek for the docked window, null for anything else", async () => {
+  const { spaceUrl, peekUrl, intentUrl, presetRoom } = await import("../public/js/rooms.js");
+  assert.equal(spaceUrl("1YqKDqWqdPLxV"), "https://x.com/i/spaces/1YqKDqWqdPLxV");
+  assert.equal(peekUrl("1YqKDqWqdPLxV"), "https://x.com/i/spaces/1YqKDqWqdPLxV/peek");
+  for (const bad of ["", null, undefined, "x.com/i/spaces/1YqKDqWqdPLxV", "1YqK/../evil", "short", "<img>"]) {
+    assert.equal(spaceUrl(bad), null, String(bad));
+    assert.equal(peekUrl(bad), null, String(bad));
+    assert.equal(intentUrl(bad), null, String(bad));
+  }
+  assert.equal(presetRoom({ id: "1YqKDqWqdPLxV", title: "" }).url, spaceUrl("1YqKDqWqdPLxV"));
+  assert.equal(intentUrl("1YqKDqWqdPLxV"),
+    "intent://x.com/i/spaces/1YqKDqWqdPLxV#Intent;scheme=https;package=com.twitter.android;"
+    + "S.browser_fallback_url=https%3A%2F%2Fx.com%2Fi%2Fspaces%2F1YqKDqWqdPLxV;end");
+});

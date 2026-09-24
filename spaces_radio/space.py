@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 # Space ids are short alphanumeric tokens, e.g. 1YqKDqWqdPLxV.
 _ID = re.compile(r"^[A-Za-z0-9]{8,20}$")
 _URL = re.compile(r"(?:x|twitter)\.com/i/spaces/([A-Za-z0-9]{8,20})")
+_DIGITS = re.compile(r"[0-9]{1,12}")
 
 
 @dataclass(frozen=True)
@@ -45,3 +46,16 @@ def parse_space_id(text: str) -> str | None:
     if match:
         return match.group(1)
     return text if _ID.match(text) else None
+
+
+def non_negative_int(raw) -> int:
+    """A count from outside (X's JSON): a whole number, never negative; anything else is 0."""
+    if isinstance(raw, bool):
+        return 0
+    if isinstance(raw, int):
+        return max(0, raw)
+    if isinstance(raw, float) and raw.is_integer():
+        return max(0, int(raw))
+    if isinstance(raw, str) and _DIGITS.fullmatch(raw):
+        return int(raw)
+    return 0

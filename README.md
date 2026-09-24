@@ -6,22 +6,58 @@ A walkie-talkie radio for your ship. Each channel is a live X Space: another shi
 Flip through rooms like a feed, listen while you work, and grab the mic if you want to.
 Built Sep 23, 2026 for winter nights, when the park is too cold. The why: [STORY.md](STORY.md).
 
+**The dial browses. The button boards. X plays the sound.**
+
 - **BAND** keys choose the topic. The **glass** shows every live room on that band: taller means busier.
-- **TUNE** knob, swipe or ← → flips rooms, with static in between.
+- **TUNE** knob, swipe or ← → lines up a room, with static in between. Tuning never touches X.
 - **Speaker grille**: one dot per person. Amber dots are hosts, green dots are on the mic, cream dots are listening.
-- **PUSH TO LISTEN / JOIN** opens the room in X. Anyone can listen on a computer, even without an account.
+  Press the speaker (or C) for the **crew manifest**: who's aboard, by name.
+- **PUSH TO LISTEN / JOIN** boards the room. Then press X's own **▶ Start listening** (see below).
+- **OPEN IN X ↗** shows the room on X itself, in its own tab. Free, always one tap away.
 - **MIC** (computer) shows a QR code that carries the room to your phone, because on X the web can only
   listen. Talking needs the X app and an account.
-- **SCAN** (computer only) hops to a new room every few minutes and steers the same X window.
+- **SCAN** (computer only) lines up a new room every few minutes; you push to jump.
 - **Presets** save rooms. They live in each person's own browser.
+- Keys: ← → tune · L listen · H I hear it · C crew · O open in X · ? manual · Esc close.
+
+## The two-key launch
+
+X gives no public audio stream for Spaces, so the sound always plays inside X. Browsers only let a site
+make sound after you press something *on that site*, and X's room page (`x.com/i/spaces/<id>` redirects to
+`/peek`) waits for its own **Start listening** button ("Start listening anonymously" when logged out).
+So every room takes two presses:
+
+1. **PUSH** on the radio. On a computer, X opens docked beside the radio (a 440px pop-up at `/peek`).
+   On a phone, the button is a plain same-tab link to the room, so the X app can catch it.
+2. **▶ Start listening** in X, once per room.
+
+The radio can't hear X, so it never claims to. After a push it stands by (lamp **STBY**, rail lamp 2
+blinking violet) and teaches key 2 in the airlock panel. Only you can put it **ON AIR**, by pressing
+**I HEAR IT** (or **I'M IN** on a phone). If you come back without answering, it asks. If nothing plays,
+**NO SOUND?** walks through the fixes in order.
+
+- Pressing PUSH again on the same room brings the X window forward; it never reloads it or opens a second one.
+- On another room, PUSH steers the X window the radio still holds, or opens a fresh one.
+- A blocked pop-up turns PUSH into a plain **OPEN IN X ↗** link, which always works. The radio remembers
+  the block for the session, so later rooms go straight to a new tab instead of wasting a press.
+- If the radio loses track of the X window, it never says the room stopped: it asks whether you hear it,
+  and PUSH reopens only if you don't (otherwise two rooms would play).
+- Phone trips: the page remembers the room you left for however long you listen, and asks "did it play?"
+  when you return. If the page was reloaded meanwhile, the trip rides in `sessionStorage` for 30 minutes.
+  If X played in the radio's own tab (no X app, or the home-screen radio), coming back stopped the sound,
+  and the radio says so instead of offering I'M IN. In-app browsers (Instagram, TikTok…) get a banner,
+  because they can't hand rooms to X.
 
 ## Run it locally
 
 ```bash
 cd ~/Morrow/showcase/spaces-radio && python3 -m spaces_radio.server
+SPACES_RADIO_FAKE=1 python3 -m spaces_radio.server   # fake rooms and a fake crew: no key, no network, no cost
 ```
 
 Open http://127.0.0.1:8740. Add `X_BEARER_TOKEN` to the environment for live search (see below).
+Fake mode serves six sample rooms and a sample crew for any room; `0000000ended` and `0000000limit`
+exercise the "ended" and "busy" crew states. It is ignored on Vercel.
 
 ## Hosting (Vercel)
 
@@ -29,8 +65,11 @@ Open http://127.0.0.1:8740. Add `X_BEARER_TOKEN` to the environment for live sea
 - The X key lives only in the Vercel environment (`X_BEARER_TOKEN`). Listeners never need a key.
 - **One key, many listeners.** `/api/tune` answers carry `Vercel-CDN-Cache-Control: max-age=600`,
   so everyone on the same band in the same 10 minutes shares one answer, and X is asked once.
-  Any extra query parameter is refused, so nobody can bypass that cache and run up the bill.
+  Any extra query parameter, or any other spelling of the same one (`%6dusic`, a trailing `&`), is refused,
+  so nobody can bypass that cache and run up the bill.
 - Add the key: `vercel env add X_BEARER_TOKEN production`, paste the token, then redeploy.
+- `api/crew.py` serves the crew manifest (`/api/crew?id=<space id>`, plus the room's `&t=<ticket>`), with the
+  same one-spelling rule.
 
 ## What it costs
 
@@ -44,6 +83,39 @@ no matter how often it's seen. So cost follows *how many distinct rooms show up*
 - The server also keeps a soft daily guard (`SPACES_RADIO_DAILY_CAP`, default $0.50), but on Vercel
   each instance keeps its own, so don't rely on it as the cap.
 
+### Crew names cost more
+
+The crew manifest asks X for one Space plus its people: **$0.005 per Space and $0.010 per person**
+(user reads are billed per user returned), both deduplicated per UTC day. A typical room (1 host,
+2 co-hosts, 8 speakers) costs about $0.11 on its first scan of the day, and about $0 after that,
+plus $0.010 for each new person on the mic. So names load only when someone asks:
+
+- **Only a press scans**: the speaker, the C key, TRY AGAIN or REFRESH. Never on load, tuning, band
+  switches, SCAN, the 10-minute refresh or PUSH.
+- **Shared and cached**: the server keeps each roster 120 s (600 s for ended rooms) and the CDN shares
+  it with everyone. Each browser also remembers it for 120 s, scans one room at a time, and at most
+  6 rooms per 10 minutes.
+- **Priced before it's bought**: each scan first asks X for the Space alone (its state and plain id
+  lists, no names, one Space read). A room that isn't live stops there and pays for no names. A live
+  room is priced from those id lists, and the whole crew is fetched only if it fits under the cap.
+- **Only rooms the radio found**: `/api/tune` gives each room a ticket (an HMAC of the id and a
+  half-hour window, keyed from `X_BEARER_TOKEN` or `SPACES_RADIO_TICKET_KEY`). Without a valid ticket,
+  such as a preset or a scripted request for any id, the crew scan names only the host.
+- **Its own caps**: `SPACES_RADIO_CREW_DAILY_CAP` (default **$0.50** of names) and
+  `SPACES_RADIO_CREW_SPACE_CAP` (default **$0.10** of Space reads made for names), separate from the band
+  cap, so names can never starve the dial. A room the dial already paid for today is read for free. Near
+  the cap it degrades to host-only (about $0.01), then rests until midnight UTC. `SPACES_RADIO_CREW=off`
+  switches names off.
+- **Safe under load**: every paid call reserves its worst case before asking X and settles what X billed
+  afterwards, under a lock, so requests arriving together can't all spend the same last dollar. Two
+  requests for one room share one scan. After X answers busy (429), out of credits (402) or refused (401/403),
+  nobody asks X again for 30 to 60 seconds; cached rosters still show.
+- **Per instance on Vercel**: like the band cap, these ledgers live in each instance's `/tmp`, so they are
+  soft guards. **X's spending limit is the only hard cap** (keep auto-recharge off). A Vercel WAF rate limit
+  on `/api/crew` (about 10 requests a minute per IP) is the recommended next guard.
+- **OPEN IN X ↗** is always there and free: X's own page shows everyone aboard.
+- Logs keep only the Space id, the person count, the mode and today's crew spend. Never names.
+
 ## How it's built (Head First, chapter 1: Strategy)
 
 - `spaces_radio/sources.py`: the radio asks a `SpaceSource` for rooms and doesn't care where they
@@ -51,9 +123,16 @@ no matter how often it's seen. So cost follows *how many distinct rooms show up*
   one new class each.
 - `service.py`: what the radio answers (and how long it may be cached), shared by the local server and Vercel.
 - `stations.py`: band → search words. Edit these to change the dial.
-- `public/js/rooms.js`: pure helpers (sorting, the FM dial, the crowd in the grille, presets).
+- `public/js/rooms.js`: pure helpers (sorting, the FM dial, the crowd in the grille, presets, room links).
   `handoff.js`: the MIC-to-phone QR (uses the vendored MIT `qrcode-generator` 2.0.4 in `public/vendor/`).
-  `sfx.js`: static and roger beep made with Web Audio. `app.js`: state and drawing.
+  `sfx.js`: small Web Audio sounds (static, roger beep, hail, lock). `app.js`: state and drawing.
+- The launch is a state machine (Head First, chapter 10: State). `airlock.js` is the pure reducer
+  (`airNext`), `airlock-copy.js` turns a state into every word on screen, `listener.js` plans a push
+  and reads the X window, `dock.js` places it, `xwindow.js` owns the one mutable thing (the window
+  handle), `launch.js` wires presses to all of it, and `airlock-view.js` draws it.
+- `crew.js` (loaded only when asked, via `aboard.js`) draws the crew manifest. If it can't load, the
+  radio keeps working and points at OPEN IN X. On the server, `crew_parse.py` reads X's answer (pure),
+  `crew.py` does the paid lookup, `budget.py` keeps the ledgers and `ticket.py` signs the rooms.
 
 Tests (no network): `python3 -m unittest discover -s tests -t .` and `node --test tests/*.mjs`.
 
@@ -68,9 +147,20 @@ Tests (no network): `python3 -m unittest discover -s tests -t .` and `node --tes
 ## Limits
 
 - Audio plays in X, not in this page, because X offers no public audio stream for Spaces.
-  X may ask you to click "Start listening".
-- X's pages may cut the radio off from the X window it opens (`Cross-Origin-Opener-Policy`).
-  The radio detects this. If it can steer the window, the dial and SCAN switch rooms for you.
-  If it can't, flipping queues the next room and the button reads PUSH TO SWITCH, so two rooms never play at once.
-- Presets don't know whether a room is still live until you join it.
+  **Every room needs one press of X's Start listening.** The radio can't press it for you.
+- **The dial never steers X.** Tuning, band keys, SCAN and refresh only line a room up; PUSH jumps.
+  Steering a playing room would silence it until you pressed Start listening again.
+- X's pages may cut the radio off from the X window it opens (`Cross-Origin-Opener-Policy`). The radio
+  watches for it: if it keeps the window, PUSH steers and focuses it; if not, it says so and offers a
+  plain link. When the window disappears, the radio says it lost track, never that the room stopped.
+- **I HEAR IT is self-reported.** If you skip it, the radio stays at STBY, which is honest.
+- Pop-up placement is a request: browsers may ignore it on other monitors or in full screen.
+- X names hosts and speakers, and counts listeners (signed-in ones only). It never says who's listening.
+- Presets don't know whether a room is still live until you join it or open its crew.
 - The live X path is tested against a fake API only until a real key is added.
+
+Still to check by hand on one live Space, in Chrome and Safari, logged in and out: whether pressing
+Start listening inside the `/peek` pop-up keeps the radio's handle; whether logged-in users also land on
+`/peek`; whether the 440×780 pop-up is readable; whether a same-tab tap opens the X app on an iPhone;
+the first real `/api/crew` answer (host and speaker ids, creator id) and its charge in the X console;
+and whether Safari and Firefox honor the pop-up placement.

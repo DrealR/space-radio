@@ -164,6 +164,16 @@ class GatherTests(TmpCase):
         self.assertIn("speaker_ids", fake.urls[0])
         self.assertNotIn("expansions", fake.urls[0])
 
+    def test_hosts_on_the_mic_are_not_counted_twice(self):
+        fake = FakeX([x_item(ID_A, host_ids=["1", "2", "1"], speaker_ids=["2", "3", "3", "4"])])
+        room = XApiSource("tok", Budget(self.dir / "b.json"), fetch=fake).live("music")[0]
+        self.assertEqual((room.hosts, room.speakers), (2, 2))
+
+    def test_junk_counts_from_x_become_zero(self):
+        fake = FakeX([x_item(ID_A, listeners="lots", host_ids="1", speaker_ids=None)])
+        room = XApiSource("tok", Budget(self.dir / "b.json"), fetch=fake).live("music")[0]
+        self.assertEqual((room.listeners, room.hosts, room.speakers), (0, 0, 0))
+
     def test_unknown_station(self):
         with self.assertRaises(KeyError):
             tune("nope", [])

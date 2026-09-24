@@ -30,7 +30,7 @@ export function buildDeck(live, sort, presets) {
 
 export function presetRoom(p) {
   return { id: p.id, title: p.title || "Preset room", listeners: null, speakers: 0, hosts: 0,
-           started_at: "", lang: "", source: "yours", url: `https://x.com/i/spaces/${p.id}` };
+           started_at: "", lang: "", source: "yours", url: spaceUrl(p.id) };
 }
 
 /** Spread the deck across the FM band so "next" always sweeps the needle right. */
@@ -117,6 +117,25 @@ export function addPreset(presets, id, title) {
 }
 
 export const removePreset = (presets, id) => presets.filter((p) => p.id !== id);
+
+/** The room's canonical page on X: shared, copied, used for the QR and every plain link. */
+export function spaceUrl(id) {
+  return ID.test(String(id ?? "")) ? `https://x.com/i/spaces/${id}` : null;
+}
+
+/** X's room card with its "Start listening" button; only for the docked X window. */
+export function peekUrl(id) {
+  const url = spaceUrl(id);
+  return url && `${url}/peek`;
+}
+
+/** Android only: ask for the X app by package, falling back to the web page. */
+export function intentUrl(id) {
+  const url = spaceUrl(id);
+  if (!url) return null;
+  return `intent://x.com/i/spaces/${id}#Intent;scheme=https;package=com.twitter.android;`
+    + `S.browser_fallback_url=${encodeURIComponent(url)};end`;
+}
 
 // X tags each Space with a language. "other" (undetermined) is common for short English
 // titles like "Chill", so English-only keeps en, other and unknown and drops the rest.

@@ -1,8 +1,12 @@
 """Space Radio, local dev server. Same answers as the Vercel functions.
 
     python3 -m spaces_radio.server            # no key: people paste rooms they find
+    SPACES_RADIO_FAKE=1 python3 -m spaces_radio.server
+                                              # fake X: sample rooms and crew, no key, no network, no cost
     python3 ~/Morrow/tools/mo_keys.py run --project spaces-radio -- python3 -m spaces_radio.server
-                                              # + live search via X_BEARER_TOKEN (paid)
+                                              # + live search and crew names via X_BEARER_TOKEN (paid)
+
+Fake mode ids to try on /api/crew?id=: any live room, 0000000ended, 0000000limit.
 
 Listens on 127.0.0.1 only.
 """
@@ -13,7 +17,7 @@ import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from .service import Reply, RadioService, envelope, service_from_env, write_reply
 
@@ -34,7 +38,9 @@ def make_handler(service: RadioService):
             if url.path == "/api/status":
                 return write_reply(self, service.status())
             if url.path == "/api/tune":
-                return write_reply(self, service.tune(parse_qs(url.query, keep_blank_values=True)))
+                return write_reply(self, service.tune_raw(url.query))
+            if url.path == "/api/crew":
+                return write_reply(self, service.crew_raw(url.query))
             self._static(url.path)
 
         def _static(self, url_path: str):
@@ -53,7 +59,8 @@ def main() -> None:
     service = service_from_env()
     server = ThreadingHTTPServer(("127.0.0.1", PORT), make_handler(service))
     mode = "live search on" if service.live_search else "no X key: pasted rooms only"
-    print(f"Space Radio · http://127.0.0.1:{PORT} · {mode}")
+    mode += " · crew names on" if service.crew_names else ""
+    print(f"Space Radio · http://127.0.0.1:{PORT} · {mode}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

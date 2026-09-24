@@ -1,4 +1,4 @@
-"""Vercel function: GET /api/tune. Thin: the answer comes from RadioService."""
+"""Vercel function: GET /api/crew?id=<Space id>. Thin: the answer comes from RadioService."""
 import os
 import sys
 from http.server import BaseHTTPRequestHandler
@@ -11,5 +11,5 @@ from spaces_radio.service import shared_service, write_reply  # noqa: E402
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        # The raw query: the CDN keys on it, so only one spelling per band is served.
-        write_reply(self, shared_service().tune_raw(urlparse(self.path).query))
+        # The raw query: the CDN keys on it, so only one spelling per room is served.
+        write_reply(self, shared_service().crew_raw(urlparse(self.path).query))
