@@ -93,3 +93,11 @@ test("band labels fit the keys", () => {
   assert.equal(bandLabel("late night"), "LATE");
   assert.equal(bandLabel("music"), "MUSIC");
 });
+
+test("English-only keeps en, other and unknown; drops other languages", async () => {
+  const { onlyEnglish, langLabel } = await import("../public/js/rooms.js");
+  const rooms = ["en", "other", "", undefined, "ja", "ro", "EN"].map((lang, i) => ({ id: `r${i}`, lang }));
+  assert.deepEqual(onlyEnglish(rooms, true).map((r) => r.id), ["r0", "r1", "r2", "r3", "r6"]);
+  assert.equal(onlyEnglish(rooms, false).length, rooms.length);
+  assert.deepEqual(["en", "other", "", "ja"].map(langLabel), ["EN", "", "", "JA"]);
+});

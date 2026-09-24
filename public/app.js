@@ -1,7 +1,7 @@
 // Space Radio SR-26. State is replaced, never edited in place; render() draws it.
 import {
   GRILLE_DOTS, MAX_PRESETS, addPreset, ago, bandLabel, buildDeck, frequency, grillePlan,
-  parseSpaceId, position, removePreset, signalBars,
+  langLabel, onlyEnglish, parseSpaceId, position, removePreset, signalBars,
 } from "./js/rooms.js";
 import { joinCopy, qrSvg } from "./js/handoff.js";
 import { planJoin, readWindow } from "./js/listener.js";
@@ -22,7 +22,7 @@ const coarse = window.matchMedia("(pointer: coarse)").matches;
 let state = {
   bands: [], band: "anything", live: [], presets: [], sort: "busy", currentId: null,
   listening: false, playingId: null, steer: "unknown",
-  scan: false, scanMin: 5, scanAt: 0, sfx: true, liveSearch: false,
+  scan: false, scanMin: 5, scanAt: 0, sfx: true, english: true, liveSearch: false,
   loading: true, problems: [], flash: "", turn: 0,
 };
 let listenWindow = null;
@@ -31,7 +31,8 @@ let flashTimer = 0;
 let userActed = false; // browsers only allow sound after a tap or key press
 
 const set = (patch) => { state = { ...state, ...patch }; render(); };
-const deck = () => buildDeck(state.live, state.sort, state.presets);
+const deckFor = (live) => buildDeck(onlyEnglish(live, state.english), state.sort, state.presets);
+const deck = () => deckFor(state.live);
 function currentIndex(d = deck()) {
   const i = d.findIndex((r) => r.id === state.currentId);
   return i < 0 ? 0 : i;
@@ -45,7 +46,8 @@ function readJson(key, fallback) {
 function writeJson(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ }
 }
-const savePrefs = () => writeJson(PREFS_KEY, { band: state.band, sort: state.sort, scanMin: state.scanMin, sfx: state.sfx });
+const savePrefs = () => writeJson(PREFS_KEY, { band: state.band, sort: state.sort, scanMin: state.scanMin,
+                                               sfx: state.sfx, english: state.english });
 
 async function api(path) {
   try {
@@ -124,9 +126,10 @@ async function tuneBand(band, { refresh = false } = {}) {
   if (res.error) return set({ loading: false, problems: [res.error] });
   const keepId = switching ? null : state.currentId;
   const live = res.data;
-  const stillThere = keepId && buildDeck(live, state.sort, state.presets).some((r) => r.id === keepId);
+  const next = deckFor(live);
+  const stillThere = keepId && next.some((r) => r.id === keepId);
   set({ live, loading: false, problems: res.meta.problems || [],
-        currentId: stillThere ? keepId : buildDeck(live, state.sort, state.presets)[0]?.id ?? null });
+        currentId: stillThere ? keepId : next[0]?.id ?? null });
   if (switching && state.listening) join(current());
 }
 
@@ -221,13 +224,14 @@ function renderBands() {
 function screenText(room, d, i) {
   if (state.loading) return { title: "SCANNING THE BAND…", info: "" };
   if (!room && !state.liveSearch) return { title: "NO SIGNAL · PROGRAM A PRESET ↓", info: "AUTO-TUNE IS OFF" };
+  if (!room && state.english && state.live.length) return { title: "ONLY OTHER LANGUAGES HERE", info: "FLIP EN OFF TO HEAR THEM" };
   if (!room) return { title: "DEAD AIR ON THIS BAND", info: "TRY ANOTHER BAND" };
   if (room.source === "yours") {
     const slot = state.presets.findIndex((p) => p.id === room.id) + 1;
     return { title: room.title, info: `PRESET P${slot} · MAY HAVE ENDED` };
   }
   const bits = [`${room.listeners} IN ROOM`, room.speakers ? `${room.speakers} ON MIC` : "", ago(room.started_at),
-                room.lang ? room.lang.toUpperCase() : ""];
+                langLabel(room.lang)];
   return { title: room.title, info: bits.filter(Boolean).join(" · ") };
 }
 
@@ -330,6 +334,7 @@ function renderControls(room) {
   $("radio").classList.toggle("live", state.listening);
   $("scan-on").checked = state.scan;
   $("sfx-on").checked = state.sfx;
+  $("en-on").checked = state.english;
 }
 
 function renderFoot() {
@@ -412,6 +417,7 @@ function wire() {
     savePrefs();
   });
   $("sfx-on").addEventListener("change", (e) => { set({ sfx: e.target.checked }); savePrefs(); });
+  $("en-on").addEventListener("change", (e) => { set({ english: e.target.checked }); savePrefs(); });
   $("add-form").addEventListener("submit", programPreset);
   $("mic").addEventListener("click", openHandoff);
   $("handoff-copy").addEventListener("click", copyRoomLink);
@@ -429,7 +435,7 @@ async function start() {
   const prefs = readJson(PREFS_KEY, {});
   const presets = readJson(PRESETS_KEY, []).filter((p) => p && parseSpaceId(p.id));
   state = { ...state, presets, sort: prefs.sort || "busy", scanMin: prefs.scanMin || 5,
-            sfx: prefs.sfx !== false };
+            sfx: prefs.sfx !== false, english: prefs.english !== false };
   $("scan-min").value = String(state.scanMin);
   wire();
   render();

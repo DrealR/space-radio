@@ -117,3 +117,17 @@ export function addPreset(presets, id, title) {
 }
 
 export const removePreset = (presets, id) => presets.filter((p) => p.id !== id);
+
+// X tags each Space with a language. "other" (undetermined) is common for short English
+// titles like "Chill", so English-only keeps en, other and unknown and drops the rest.
+const ENGLISH_ISH = new Set(["en", "other", "", "und"]);
+
+export function onlyEnglish(rooms, on) {
+  return on ? rooms.filter((r) => ENGLISH_ISH.has((r.lang || "").toLowerCase())) : rooms;
+}
+
+/** What the screen shows for a language: nothing when X couldn't tell. */
+export function langLabel(lang) {
+  const code = (lang || "").toLowerCase();
+  return code === "en" || !ENGLISH_ISH.has(code) ? code.toUpperCase() : "";
+}
