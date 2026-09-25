@@ -20,6 +20,14 @@ Built Sep 23, 2026 for winter nights, when the park is too cold. The why: [STORY
   listen. Talking needs the X app and an account.
 - **SCAN** (computer only) lines up a new room every few minutes; you push to jump.
 - **Presets** save rooms. They live in each person's own browser.
+- **LOG** (next to ◎ RADAR) is the ship's log: every ship you boarded, when, for how long, on which band,
+  stamped **HEARD ✓** once you pressed I HEAR IT. **RE-TUNE** lines a logged ship up on the dial (never
+  switching bands, which could spend fuel); **OPEN IN X ↗** is free; **✕** strikes one flight; **Clear log**
+  (press twice) empties it. The log lives only in your browser (the last 40 flights) and is never sent anywhere.
+- **☆ STAR HOST** on a logged flight makes that host a favorite. When a starred host's ship is live on the
+  band you're on, it comes first on the dial with a ★ on the glass. Matching uses the host ids the band's
+  search already returned, so stars never cost an X call. A host a crew scan named shows as @handle;
+  otherwise the star remembers the room ("the host of …"). Presets and beamed rooms have no known host.
 - Keys: ← → tune · L listen · H I hear it · C crew · O open in X · ? manual · Esc close.
 
 ## Run your own
@@ -198,6 +206,9 @@ The crew manifest asks X for one Space plus its people: **$0.005 per Space and $
   (`airNext`), `airlock-copy.js` turns a state into every word on screen, `listener.js` plans a push
   and reads the X window, `dock.js` places it, `xwindow.js` owns the one mutable thing (the window
   handle), `launch.js` wires presses to all of it, and `airlock-view.js` draws it.
+- The ship's log: `flightlog.js` (pure: a flight starts when you board, its clock runs while docked or
+  on air and uses the trip's own times on a phone, and it stops while the radio has lost track of X),
+  `favorites.js` (pure: stars, and live starred ships first), `flightlog-view.js` (the card and storage).
 - `crew.js` (loaded only when asked, via `aboard.js`) draws the crew manifest. If it can't load, the
   radio keeps working and points at OPEN IN X. On the server, `crew_parse.py` reads X's answer (pure),
   `crew.py` does the paid lookup, `budget.py` keeps the ledgers and `ticket.py` signs the rooms.
@@ -206,9 +217,10 @@ Tests (no network): `python3 -m unittest discover -s tests -t .` and `node --tes
 
 ## Roadmap
 
-- **Favorite hosts.** X's Activity API sends `spaces.start` / `spaces.end` events for chosen accounts
-  (webhook or stream). A webhook function plus a small store would let the radio light up the moment
-  a host you love goes live. Needs storage and a webhook secret; billing for these events is unstated.
+- **Favorite hosts, anywhere.** Stars today surface a host's ship only when it's live on the band you're on.
+  X's Activity API sends `spaces.start` / `spaces.end` events for chosen accounts (webhook or stream); a
+  webhook function plus a small store would light the radio the moment a starred host goes live on any
+  band. Needs storage and a webhook secret; billing for these events is unstated.
 - **Community rooms.** Anyone who finds a live room can add it to a shared list (free, needs storage and light moderation).
 - **Preset check.** Mark presets live or ended with one Spaces lookup, $0.005 per room per day.
 
@@ -225,6 +237,8 @@ Tests (no network): `python3 -m unittest discover -s tests -t .` and `node --tes
 - Pop-up placement is a request: browsers may ignore it on other monitors or in full screen.
 - X names hosts and speakers, and counts listeners (signed-in ones only). It never says who's listening.
 - Presets don't know whether a room is still live until you join it or open its crew.
+- The log's times are the radio's own view: it counts while X is docked or ON AIR, can't hear X, and
+  stops counting when it loses track of the X window. A flight never runs past 12 hours.
 - The live X path is tested against a fake API only until a real key is added.
 
 Still to check by hand on one live Space, in Chrome and Safari, logged in and out: whether pressing
