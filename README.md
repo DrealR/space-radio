@@ -16,6 +16,9 @@ Built Sep 23, 2026 for winter nights, when the park is too cold. The why: [STORY
   Press the speaker (or C) for the **crew manifest**: who's aboard, by name.
 - **PUSH TO LISTEN / JOIN** boards the room. Then press X's own **▶ Start listening** (see below).
 - **OPEN IN X ↗** shows the room on X itself, in its own tab. Free, always one tap away.
+- **TRANSMIT ↗** carries the room out as a post: it opens the X Factory at
+  [reemifai.org/station](https://reemifai.org/station) with the room's title (and its host, only if a crew scan
+  already named them). A plain link: free, no X call, and nothing is posted until you press Post there.
 - **MIC** (computer) shows a QR code that carries the room to your phone, because on X the web can only
   listen. Talking needs the X app and an account.
 - **SCAN** (computer only) lines up a new room every few minutes; you push to jump.

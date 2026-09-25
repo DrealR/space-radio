@@ -23,6 +23,7 @@ import { rogerBeep, staticBurst, tick as detent } from "./js/sfx.js";
 import { openRadar } from "./js/radar.js";
 import { bandKey, findBand, isMine, loadBands, mergeRooms, searchPath } from "./js/mybands.js";
 import { readBeam } from "./js/beam.js";
+import { transmitUrl } from "./js/transmit.js";
 import { beamCurrent, landBeam, makeBand, MYBANDS_KEY } from "./js/bridge.js";
 import { createDock } from "./js/tunnel.js";
 import { readDock } from "./js/dock-model.js";
@@ -196,6 +197,11 @@ function renderSpeaker(room) {
   const openX = $("open-x");
   openX.hidden = !room;
   openX.href = (room && spaceUrl(room.id)) || "#";
+  // Free: the host rides along only if a crew scan already named them. Never scans.
+  const transmit = $("transmit");
+  const url = transmitUrl(room, room && freshRoster(state.rosters, room.id)?.host);
+  transmit.hidden = !url;
+  transmit.href = url || "#";
 }
 
 function renderControls() {
@@ -272,6 +278,11 @@ function wireLaunch() {
   $("speaker").addEventListener("click", openCrew);
   $("radar-btn").addEventListener("click", showRadar);
   $("beam").addEventListener("click", () => beamCurrent(app));
+  $("transmit").addEventListener("click", () => {
+    if (sfxOk()) rogerBeep();
+    flash("TRANSMITTING · X FACTORY ↗");
+    say("The X Factory opened in a new tab with this room. Nothing is posted until you press Post.");
+  });
   $("dock-btn").addEventListener("click", () => tunnel.open());
   $("fuel").addEventListener("click", () => fuel.open());
   $("open-x").addEventListener("click", launch.openXClick);

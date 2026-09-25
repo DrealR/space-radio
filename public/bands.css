@@ -5,6 +5,7 @@
 
 .speaker-links { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .open-x.beam { border: 0; cursor: pointer; background: #1b2a4a; color: #cfe6ff; transform: rotate(1.4deg); }
+.open-x.transmit { background: #3a2410; color: #ffd9a8; transform: rotate(-0.8deg); }
 
 .bandmaker { border: 0; padding: 0; background: transparent; max-width: calc(100vw - 24px); }
 .bandmaker::backdrop { background: rgba(10, 6, 4, .72); backdrop-filter: blur(3px); }
