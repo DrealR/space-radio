@@ -1,0 +1,35 @@
+/* The fuel gauge (next to BAND and RADAR) and the fuel log card. */
+.fuel-gauge { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 9px; border: 0; border-radius: 2px;
+  cursor: pointer; background: #2a1d10; color: #ffd9a8; font: 700 10px/1 var(--mono); letter-spacing: .08em;
+  transform: rotate(-1deg); box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255, 177, 59, .45); }
+.fuel-gauge::before { content: "⛽"; font-size: 12px; }
+.fuel-tank { width: 34px; height: 8px; border-radius: 4px; background: rgba(0,0,0,.45); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
+.fuel-tank i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7dff9a, #f2b21a); transition: width .5s ease; }
+.fuel-gauge[data-level="low"] { box-shadow: inset 0 0 0 2px #f2b21a, 0 0 10px rgba(242, 178, 26, .5); }
+.fuel-gauge[data-level="low"] .fuel-tank i { background: #f2b21a; }
+.fuel-gauge[data-level="empty"] { box-shadow: inset 0 0 0 2px #ff4a2e, 0 0 12px rgba(255, 74, 46, .55); color: #ffb3a6; }
+.fuel-gauge[data-level="empty"] .fuel-tank i { background: #ff4a2e; }
+[data-kind="phone"] .fuel-gauge { min-height: 44px; }
+
+.fuelcard { border: 0; padding: 0; background: transparent; max-width: calc(100vw - 24px); }
+.fuelcard::backdrop { background: rgba(10, 6, 4, .72); backdrop-filter: blur(3px); }
+.fc-card { width: min(420px, calc(100vw - 24px)); padding: 22px; border-radius: 6px; font-family: var(--mono);
+  background: var(--paper); color: var(--paper-ink); box-shadow: 0 24px 40px rgba(0,0,0,.5); }
+.fc-kicker { margin: 0; font: 700 11px var(--mono); letter-spacing: .3em; text-transform: uppercase; color: var(--orange); }
+.fc-total { margin: 6px 0 10px; font: 28px/1.1 Bungee, var(--mono); }
+.fc-rows, .fc-costs { list-style: none; padding: 0; margin: 0; }
+.fc-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; padding: 8px 0; border-bottom: 1px dotted rgba(43,34,27,.35); font-size: 12px; }
+.fc-label { font-weight: 700; }
+.fc-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: rgba(43,34,27,.15); overflow: hidden; }
+.fc-bar i { display: block; height: 100%; background: linear-gradient(90deg, #3fb86e, #f2b21a); }
+.fc-row small { grid-column: 1 / -1; opacity: .7; }
+.fc-card h3 { margin: 16px 0 6px; font: 700 12px var(--mono); letter-spacing: .2em; text-transform: uppercase; }
+.fc-costs li { display: grid; grid-template-columns: 92px 1fr; gap: 1px 10px; padding: 5px 0; font-size: 12px; }
+.fc-costs b { color: var(--orange); }
+.fc-costs small { grid-column: 2; opacity: .7; }
+.fc-free, .fc-tip, .fc-note { font-size: 12px; margin: 4px 0; }
+.fc-tip { font-weight: 700; }
+.fc-note { opacity: .7; }
+.fc-close { width: 100%; margin-top: 14px; min-height: 44px; border: 2px solid var(--paper-ink); background: var(--paper-ink); color: var(--paper);
+  border-radius: 3px; cursor: pointer; font: 700 12px var(--mono); letter-spacing: .12em; }
+.band-tools { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }

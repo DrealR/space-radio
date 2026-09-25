@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="radar.css">
   <link rel="stylesheet" href="bands.css">
   <link rel="stylesheet" href="tunnel.css">
+  <link rel="stylesheet" href="fuel.css">
 </head>
 <body>
   <!-- Glyphs the web fonts don't carry (and some phones draw as emoji). -->
@@ -87,13 +88,16 @@
 
         <div class="band-head">
           <div class="dymo" aria-hidden="true">BAND</div>
-          <button type="button" id="radar-btn" class="radar-btn" aria-haspopup="dialog" title="Radar: every ship on this band (R)">◎ RADAR</button>
+          <span class="band-tools">
+            <button type="button" id="radar-btn" class="radar-btn" aria-haspopup="dialog" title="Radar: every ship on this band (R)">◎ RADAR</button>
+            <button type="button" id="fuel" class="fuel-gauge" aria-haspopup="dialog" title="X fuel today: what costs money"><span class="fuel-tank"><i id="fuel-fill"></i></span><span id="fuel-text">FUEL</span></button>
+          </span>
         </div>
         <nav id="bands" class="bands" aria-label="Bands"></nav>
 
         <section class="deck">
           <div class="speaker-col">
-            <button type="button" id="speaker" class="speaker" aria-haspopup="dialog" aria-controls="crew" aria-describedby="grille-key" disabled>
+            <button type="button" id="speaker" class="speaker" aria-haspopup="dialog" aria-controls="crew" aria-describedby="grille-key" title="Who's here: loads names from X (about 1¢ a person). OPEN IN X is free." disabled>
               <div id="grille" class="grille" aria-hidden="true"></div>
               <div id="grille-key" class="grille-key"></div>
               <span id="speaker-cta" class="speaker-cta">WHO'S HERE <svg class="g" aria-hidden="true" focusable="false"><use href="#g-tri"/></svg></span>
@@ -187,6 +191,15 @@
         <li><b>BEAM ✦</b> sends a friend a link that opens their radio on the room you're on, so you can hang out in the same Space.</li>
         <li><b>DOCK ⟷</b> links your radio with one friend's through a tunnel. See below.</li>
       </ol>
+
+      <h2>Fuel (what costs money)</h2>
+      <p>The radio pays X a little for what it looks up: ½¢ per room it finds and 1¢ per person it names. The <b>⛽ gauge</b> shows today's spend. Tap it for what spent it.</p>
+      <ul class="facts">
+        <li><b>Up to 10¢:</b> opening a band nobody opened in the last hour. After that, everyone shares the answer for free.</li>
+        <li><b>About 10–15¢:</b> WHO'S HERE on a busy room. <b>OPEN IN X</b> shows the same people for free.</li>
+        <li><b>Free:</b> flipping, radar, SCAN, PUSH, docking and tones, beam, presets.</li>
+        <li>When the day's fuel runs out, or X credits do, the radio keeps playing the last rooms it found.</li>
+      </ul>
 
       <h2>Docking</h2>
       <p>Rocky and Grace couldn't breathe the same air, so they met at a clear wall and spoke in chords. Docking works the same way. Your two radios link through a tunnel, and each of you keeps your own dial and your own X.</p>

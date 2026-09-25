@@ -26,6 +26,7 @@ import { readBeam } from "./js/beam.js";
 import { beamCurrent, landBeam, makeBand, MYBANDS_KEY } from "./js/bridge.js";
 import { createDock } from "./js/tunnel.js";
 import { readDock } from "./js/dock-model.js";
+import { createFuel } from "./js/fuel.js";
 
 const HUNT_URL = "https://x.com/search?q=%22x.com%2Fi%2Fspaces%22&f=live";
 const PREFS_KEY = "spaces-radio:prefs";
@@ -168,6 +169,7 @@ async function tuneBand(band, { refresh = false } = {}) {
   set({ live, loading: false, problems: res.meta.problems || [],
         currentId: stillThere ? keepId : next[0]?.id ?? null });
   if (switching) announceTune();
+  fuel.refresh(); // a band may have just bought a search
 }
 
 function tick() {
@@ -239,7 +241,9 @@ const app = {
   learn: (patch) => set({ learned: learn(state.learned, patch) }),
 };
 const launch = createLaunch(app);
-const openCrew = () => showCrew(app, launch);
+const fuel = createFuel(app);
+// Names cost fuel: read the gauge again once the scan has had time to land.
+const openCrew = () => { showCrew(app, launch); setTimeout(fuel.refresh, 4000); };
 const tunnel = createDock(app);
 const showRadar = () => openRadar({ rooms: deck(), currentId: current()?.id, band: state.band, partner: tunnel.partnerRoom() },
   (id) => select(id));
@@ -269,6 +273,7 @@ function wireLaunch() {
   $("radar-btn").addEventListener("click", showRadar);
   $("beam").addEventListener("click", () => beamCurrent(app));
   $("dock-btn").addEventListener("click", () => tunnel.open());
+  $("fuel").addEventListener("click", () => fuel.open());
   $("open-x").addEventListener("click", launch.openXClick);
   $("open-x").title = "The room on X: everyone aboard. To listen with the radio, use PUSH.";
   if (phone) $("open-x").removeAttribute("target");

@@ -93,6 +93,11 @@ class CrewLookup:
         self._flights: dict = {}     # id -> _Flight
         self._hold: tuple = ()       # (reason, until) after X refused the whole app
 
+    @property
+    def ledgers(self) -> tuple:
+        """(Space reads for names, names): for the fuel report."""
+        return self._spaces, self._users
+
     def scan(self, space_id: str, trusted: bool = True) -> Tuple[CrewScan, bool]:
         """(CrewScan, served from cache or another request's scan). Raises CrewError;
         errors are never cached. Untrusted requests (no ticket) get the host at most."""

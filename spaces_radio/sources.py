@@ -26,6 +26,23 @@ class SourceError(Exception):
     """A source failed in a way the listener should hear about."""
 
 
+class StaleRooms(SourceError):
+    """No fresh answer could be bought (out of fuel, or X said no), but an older one is on the shelf."""
+
+    def __init__(self, message: str, spaces: list, age_seconds: float):
+        super().__init__(message)
+        self.spaces = spaces
+        self.age = age_seconds
+
+
+def minutes_ago(seconds: float) -> str:
+    minutes = int(seconds // 60)
+    return "just now" if minutes < 1 else f"{minutes} min ago" if minutes < 90 else f"{minutes // 60} h ago"
+
+
+SHARED_FRESH_SECONDS = 3600  # a word's shared answer is bought at most once an hour
+
+
 class SpaceSource(Protocol):
     name: str
 
@@ -46,7 +63,7 @@ class XApiSource:
 
     def __init__(self, token: str, budget: Budget, max_results: int = 10,
                  cache_seconds: int = 600, fetch: Callable[[str, str], dict] = _http_get_json,
-                 now: Callable[[], float] = time.time):
+                 now: Callable[[], float] = time.time, answers=None):
         if not token:
             raise ValueError("XApiSource needs a bearer token")
         self._token = token
@@ -56,17 +73,29 @@ class XApiSource:
         self._fetch = fetch
         self._now = now
         self._cache: dict[str, tuple[float, list[Space]]] = {}
+        self._answers = answers  # SharedAnswers: get(word) -> (age, rooms) | None, put(word, rooms)
 
     def live(self, topic: str) -> list[Space]:
         hit = self._cache.get(topic)
         if hit and self._now() - hit[0] < self._ttl:
             return hit[1]
+        shelf = self._answers.get(topic) if self._answers else None
+        if shelf and shelf[0] < SHARED_FRESH_SECONDS:  # someone bought this word within the hour: free
+            self._cache = {**self._cache, topic: (self._now() - shelf[0], shelf[1])}
+            return shelf[1]
         # Hold the worst case before asking, so requests arriving together can't all pass the cap.
         held = self._budget.try_reserve(self._max, tag="search")
         if held is None:
-            raise SourceError("Today's X budget is used up; rooms people pasted still play.")
+            if shelf:
+                raise StaleRooms(f"Today's X fuel is used up: showing rooms from {minutes_ago(shelf[0])}.", *shelf[::-1])
+            raise SourceError("Today's X fuel is used up; rooms people pasted still play.")
         try:
             body = self._search(topic)
+        except SourceError as err:
+            self._budget.release(held)
+            if shelf:
+                raise StaleRooms(f"{err} Showing rooms from {minutes_ago(shelf[0])}.", *shelf[::-1]) from err
+            raise
         except BaseException:
             self._budget.release(held)
             raise
@@ -74,6 +103,8 @@ class XApiSource:
         spaces = [s for s in (_to_space(d, topic) for d in (data if isinstance(data, list) else [])) if s]
         self._budget.settle(held, [s.id for s in spaces])
         self._cache = {**self._cache, topic: (self._now(), spaces)}
+        if self._answers:
+            self._answers.put(topic, spaces)
         return spaces
 
     def _search(self, topic: str):
@@ -91,7 +122,7 @@ class XApiSource:
 def _explain_http(code: int) -> str:
     return {
         401: "X rejected the key (401). Check X_BEARER_TOKEN.",
-        402: "X says the account is out of credits (402).",
+        402: "X credits are empty (402): top up at console.x.com.",
         403: "X says this key can't search Spaces (403).",
         429: "X rate limit hit (429); try again in a few minutes.",
     }.get(code, f"X returned an error ({code}).")
@@ -135,6 +166,10 @@ def gather(sources: list[SpaceSource], topic: str) -> tuple[list[Space], list[st
         try:
             for space in source.live(topic):
                 found.setdefault(space.id, space)
+        except StaleRooms as err:  # older rooms beat an empty dial
+            for space in err.spaces:
+                found.setdefault(space.id, space)
+            problems.append(str(err))
         except SourceError as err:
             problems.append(f"{source.name}: {err}")
     ordered = sorted(found.values(), key=lambda s: (not s.live, -s.listeners))

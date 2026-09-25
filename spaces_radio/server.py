@@ -39,6 +39,8 @@ def make_handler(service: RadioService):
                 return write_reply(self, service.status())
             if url.path == "/api/tune":
                 return write_reply(self, service.tune_raw(url.query))
+            if url.path == "/api/fuel":
+                return write_reply(self, service.fuel())
             if url.path == "/api/search":
                 return write_reply(self, service.search_raw(url.query))
             if url.path == "/api/crew":

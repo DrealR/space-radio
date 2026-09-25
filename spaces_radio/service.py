@@ -34,6 +34,7 @@ from .stations import STATIONS, tune
 from .ticket import Tickets, ticket_key
 from .words import word_from_raw
 from . import dock as docking
+from .fuel import SharedAnswers, SharedBudget
 
 FRESH_SECONDS = 1800    # a good answer is shared for 30 minutes (each fresh search is billed)
 TROUBLE_SECONDS = 60    # a partial or failed answer is retried sooner
@@ -91,6 +92,19 @@ class RadioService:
         if raw_query not in TUNE_QUERIES:
             return Reply(400, envelope(error="Only ?station=<band> is accepted."))
         return self.tune(parse_qs(raw_query, keep_blank_values=True))
+
+    def fuel(self) -> Reply:
+        """GET /api/fuel: today's estimated X spend, by what spent it. Never cached, never touches X."""
+        rows = [_fuel_row("bands", "Band scans", "rooms found", self._budget)]
+        if self._crew:
+            rooms, names = self._crew.ledgers
+            rows += [_fuel_row("crew-rooms", "Crew lookups", "rooms checked", rooms),
+                     _fuel_row("crew-names", "Crew names", "people named", names)]
+        spent = round(sum(r["spent"] for r in rows), 3)
+        cap = round(sum(r["cap"] for r in rows), 2)
+        return Reply(200, envelope({"day": self._budget.status()["day"], "spent": spent, "cap": cap, "rows": rows,
+                                    "shared": isinstance(self._budget, SharedBudget),
+                                    "prices": {"room": PRICE_PER_SPACE, "person": PRICE_PER_USER}}))
 
     def search_raw(self, raw_query: str) -> Reply:
         """GET /api/search?q=<word>: one word for a band someone made. Same sharing and cost
@@ -175,6 +189,12 @@ def dock_store(env=os.environ):
         return None
 
 
+def _fuel_row(key: str, label: str, unit: str, budget: Budget) -> dict:
+    s = budget.status()
+    return {"key": key, "label": label, "unit": unit, "spent": round(s["spent"], 3), "cap": round(budget.cap, 2),
+            "calls": s["calls"], "items": s["spaces_paid"]}
+
+
 def dock_post(body: bytes, store=None, now=None) -> Reply:
     """POST /api/dock: one beat from a docked radio. Never cached, never touches X."""
     try:
@@ -209,19 +229,28 @@ def service_from_env(env=os.environ) -> RadioService:
     fake = env.get("SPACES_RADIO_FAKE") == "1" and "VERCEL" not in env
     default_dir = "/tmp/spaces-radio" if env.get("VERCEL") else str(Path(__file__).resolve().parent.parent / "data")
     data_dir = Path(env.get("SPACES_RADIO_DATA", default_dir)) / ("fake" if fake else "")
-    budget = Budget(data_dir / "x-budget.json", _dollars(env, "SPACES_RADIO_DAILY_CAP", DEFAULT_DAILY_CAP))
+    # On Vercel the ledgers and the answers live in the Runtime Cache: one fuel tank for every instance,
+    # and answers that survive deploys. Locally, files and this process's cache do the same job.
+    shared = (lambda: dock_store(env)) if env.get("VERCEL") else None
+    budget = _budget(shared, data_dir, "bands", "x-budget.json",
+                     _dollars(env, "SPACES_RADIO_DAILY_CAP", DEFAULT_DAILY_CAP), PRICE_PER_SPACE)
     if fake:
         print("FAKE X: no network, no cost", flush=True)
         token, fetch = "fake", make_fake_fetch(_seconds(env, "SPACES_RADIO_FAKE_DELAY", FAKE_CREW_DELAY))
     else:
         token, fetch = env.get("X_BEARER_TOKEN", "").strip(), _http_get_json
-    source = XApiSource(token, budget, fetch=fetch) if token else None
+    answers = SharedAnswers(shared) if shared else None
+    source = XApiSource(token, budget, fetch=fetch, answers=answers) if token else None
     key = ticket_key(env, token)
-    return RadioService(source, budget, _crew_from_env(env, token, budget, data_dir, fetch),
+    return RadioService(source, budget, _crew_from_env(env, token, budget, data_dir, fetch, shared),
                         Tickets(key) if key else None)
 
 
-def _crew_from_env(env, token: str, budget: Budget, data_dir: Path, fetch) -> CrewLookup | None:
+def _budget(shared, data_dir: Path, name: str, filename: str, cap: float, price: float) -> Budget:
+    return SharedBudget(name, shared, cap, price=price) if shared else Budget(data_dir / filename, cap, price=price)
+
+
+def _crew_from_env(env, token: str, budget: Budget, data_dir: Path, fetch, shared=None) -> CrewLookup | None:
     """Names need the key. SPACES_RADIO_CREW=off turns them off with no code change
     (on Vercel, environment changes apply from the next deploy).
     Names and the Space reads made for them get their own ledgers and caps, so crew browsing
@@ -229,10 +258,10 @@ def _crew_from_env(env, token: str, budget: Budget, data_dir: Path, fetch) -> Cr
     On Vercel every instance keeps its own ledgers in /tmp: X's spending limit is the real cap."""
     if not token or (env.get("SPACES_RADIO_CREW") or "").strip().lower() == "off":
         return None
-    names = Budget(data_dir / "x-crew-budget.json",
-                   _dollars(env, "SPACES_RADIO_CREW_DAILY_CAP", DEFAULT_CREW_DAILY_CAP), price=PRICE_PER_USER)
-    spaces = Budget(data_dir / "x-crew-spaces.json",
-                    _dollars(env, "SPACES_RADIO_CREW_SPACE_CAP", DEFAULT_CREW_SPACE_CAP), price=PRICE_PER_SPACE)
+    names = _budget(shared, data_dir, "crew-names", "x-crew-budget.json",
+                    _dollars(env, "SPACES_RADIO_CREW_DAILY_CAP", DEFAULT_CREW_DAILY_CAP), PRICE_PER_USER)
+    spaces = _budget(shared, data_dir, "crew-rooms", "x-crew-spaces.json",
+                     _dollars(env, "SPACES_RADIO_CREW_SPACE_CAP", DEFAULT_CREW_SPACE_CAP), PRICE_PER_SPACE)
     return CrewLookup(token, spaces, names, fetch=fetch, band_budget=budget)
 
 

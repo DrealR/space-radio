@@ -26,7 +26,7 @@ function shell() {
     el("div", { className: "bm-card" },
       el("p", { className: "bm-kicker", textContent: "New band" }),
       el("h2", { id: "bm-title", textContent: "Make a band" }),
-      el("p", { className: "bm-lede", textContent: "The radio finds live rooms whose titles use your words. Each word is its own search, so pick words people put in titles: guitar, Detroit, bible study." }),
+      el("p", { className: "bm-lede", textContent: "The radio finds live rooms whose titles use your words. Each word is its own search (up to 5¢ when nobody searched it in the last hour), so pick words people put in titles: guitar, Detroit, bible study." }),
       form, msg,
       el("ul", { id: "bm-list", className: "bm-list" }),
       close));

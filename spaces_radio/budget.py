@@ -26,8 +26,8 @@ from typing import Optional
 
 PRICE_PER_SPACE = 0.005
 PRICE_PER_USER = 0.010          # every user in includes.users is billed
-DEFAULT_DAILY_CAP = 1.00        # dollars; ~200 rooms returned a day (every request counts)
-DEFAULT_CREW_DAILY_CAP = 0.50   # dollars; ~50 new names a day (a full crew is ~9-15). Per instance on Vercel.
+DEFAULT_DAILY_CAP = 0.60        # dollars; ~120 rooms returned a day (every request counts)
+DEFAULT_CREW_DAILY_CAP = 0.40   # dollars; ~40 names a day (a full crew is ~9-15)
 DEFAULT_CREW_SPACE_CAP = 0.10   # dollars; ~20 rooms a day looked up by name, off the dial's ledger
 
 _holds = itertools.count()      # reservation keys are unique within this process
