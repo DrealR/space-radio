@@ -29,6 +29,7 @@
   <link rel="stylesheet" href="bands.css">
   <link rel="stylesheet" href="tunnel.css">
   <link rel="stylesheet" href="fuel.css">
+  <link rel="stylesheet" href="flightlog.css">
   <link rel="stylesheet" href="site.css">
 </head>
 <body>
@@ -104,6 +105,7 @@
           <span class="band-tools">
             <button type="button" id="radar-btn" class="radar-btn" aria-haspopup="dialog" title="Radar: every ship on this band (R)">◎ RADAR</button>
             <button type="button" id="fuel" class="fuel-gauge" aria-haspopup="dialog" title="X fuel today: what costs money"><span class="fuel-tank"><i id="fuel-fill"></i></span><span id="fuel-text">FUEL</span></button>
+            <button type="button" id="log-btn" class="log-btn" aria-haspopup="dialog" title="Ship's log: ships you boarded, and hosts you starred">LOG</button>
           </span>
         </div>
         <nav id="bands" class="bands" aria-label="Bands"></nav>
@@ -204,6 +206,7 @@
         <li><b>DOCK ⟷</b><span>Link two radios. Talk in tones.</span></li>
         <li><b>⛽ FUEL</b><span>What today cost, and what's free.</span></li>
         <li><b>SCAN · EN</b><span>Line up the next room · English only.</span></li>
+        <li class="wide"><b>LOG ★</b><span>Ships you boarded, kept in this browser. Star a host: their live ships come first.</span></li>
       </ul>
       <p class="legend"><i class="d host"></i> host <i class="d mic"></i> on the mic <i class="d ear"></i> listening</p>
 

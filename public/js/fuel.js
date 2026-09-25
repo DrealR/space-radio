@@ -12,7 +12,7 @@ export const COSTS = Object.freeze([
   ["WHO'S HERE (names in a room)", "about 10–15¢", "1¢ per person named, ½¢ for the room"],
   ["The same band again within the hour", "free", "everyone shares one answer"],
 ]);
-export const FREE = "Flipping rooms, the knob, ◎ RADAR, sorting, SCAN, PUSH, I HEAR IT, OPEN IN X, BEAM, DOCK and its tones, presets.";
+export const FREE = "Flipping rooms, the knob, ◎ RADAR, sorting, SCAN, PUSH, I HEAR IT, OPEN IN X, BEAM, DOCK and its tones, presets, the ship's LOG and its stars.";
 
 export const money = (dollars) => (dollars < 1 ? `${Math.round(dollars * 100)}¢` : `$${dollars.toFixed(2)}`);
 

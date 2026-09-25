@@ -17,7 +17,7 @@ import time
 from typing import Callable, Optional
 
 from .budget import PRICE_PER_SPACE, Budget, Ledger, utc_day
-from .space import Space
+from .space import Space, host_id_list
 
 FRESH_SECONDS = 3600        # one paid search per word per hour, whoever asks
 KEEP_SECONDS = 6 * 3600     # stale rooms stay available this long as a fallback
@@ -82,7 +82,7 @@ def _space_from(d: dict) -> Optional[Space]:
                      listeners=int(d.get("listeners") or 0), speakers=int(d.get("speakers") or 0),
                      hosts=int(d.get("hosts") or 0), started_at=str(d.get("started_at") or ""),
                      lang=str(d.get("lang") or ""), topic=str(d.get("topic") or ""),
-                     source=str(d.get("source") or "x-api"))
+                     source=str(d.get("source") or "x-api"), host_ids=host_id_list(d.get("host_ids")))
     except (KeyError, TypeError, ValueError):
         return None
 

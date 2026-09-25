@@ -8,6 +8,8 @@ from dataclasses import dataclass, replace
 _ID = re.compile(r"^[A-Za-z0-9]{8,20}$")
 _URL = re.compile(r"(?:x|twitter)\.com/i/spaces/([A-Za-z0-9]{8,20})")
 _DIGITS = re.compile(r"[0-9]{1,12}")
+_USER_ID = re.compile(r"[0-9]{1,20}")
+MAX_HOST_IDS = 10
 
 
 @dataclass(frozen=True)
@@ -22,6 +24,9 @@ class Space:
     topic: str = ""
     source: str = ""  # "x-api" or "yours" (pasted in the browser)
     live: bool = True
+    # X user ids of the hosts, as the search already returns them (no user lookup, no extra
+    # cost). The browser matches them against the hosts a listener starred.
+    host_ids: tuple = ()
 
     @property
     def url(self) -> str:
@@ -36,6 +41,7 @@ class Space:
             "speakers": self.speakers, "hosts": self.hosts,
             "started_at": self.started_at, "lang": self.lang, "topic": self.topic,
             "source": self.source, "live": self.live, "url": self.url,
+            "host_ids": list(self.host_ids),
         }
 
 
@@ -59,3 +65,12 @@ def non_negative_int(raw) -> int:
     if isinstance(raw, str) and _DIGITS.fullmatch(raw):
         return int(raw)
     return 0
+
+
+def host_id_list(raw) -> tuple:
+    """X's host_ids -> unique numeric ids in X's order, at most ten; junk is dropped."""
+    if not isinstance(raw, list):
+        return ()
+    ids = [str(i) for i in raw if isinstance(i, (str, int)) and not isinstance(i, bool)]
+    valid = [i for i in ids if _USER_ID.fullmatch(i)]
+    return tuple(dict.fromkeys(valid))[:MAX_HOST_IDS]
