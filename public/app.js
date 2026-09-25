@@ -27,6 +27,8 @@ import { beamCurrent, landBeam, makeBand, MYBANDS_KEY } from "./js/bridge.js";
 import { createDock } from "./js/tunnel.js";
 import { readDock } from "./js/dock-model.js";
 import { createFuel } from "./js/fuel.js";
+import { createFlightLog } from "./js/flightlog-view.js";
+import { FAVS_KEY, favoritesFirst, readFavs } from "./js/favorites.js";
 
 const HUNT_URL = "https://x.com/search?q=%22x.com%2Fi%2Fspaces%22&f=live";
 const PREFS_KEY = "spaces-radio:prefs";
@@ -51,16 +53,18 @@ let state = {
   bands: [], band: "anything", live: [], presets: [], sort: "busy", currentId: null,
   air: AIR_IDLE, airTitle: "", rosters: {}, ended: [], learned: LEARNED_NONE, popupsBlocked: false,
   scan: false, scanMin: 5, scanAt: 0, sfx: true, english: true, liveSearch: false,
-  loading: true, problems: [], flash: "", turn: 0, myBands: [], beam: null,
+  loading: true, problems: [], flash: "", turn: 0, myBands: [], beam: null, favs: [],
 };
 let flashTimer = 0;
 let userActed = false; // browsers only allow sound after a tap or key press
 
 const set = (patch) => { state = { ...state, ...patch }; render(); };
-// A beamed room rides at the end of the deck (like a preset) until it turns up live.
+// A beamed room (or one re-tuned from the log) rides at the end of the deck, like a preset, until
+// it turns up live. Live ships of starred hosts come first.
 const withBeam = (presets) => (state.beam && !presets.some((p) => p.id === state.beam.id) ? [...presets, state.beam] : presets);
-const deckFor = (live) => buildDeck(onlyEnglish(live, state.english), state.sort, withBeam(state.presets))
-  .map((r) => (state.beam && r.id === state.beam.id && r.listeners == null ? { ...r, beamed: true } : r));
+const deckFor = (live) => favoritesFirst(buildDeck(onlyEnglish(live, state.english), state.sort, withBeam(state.presets)), state.favs)
+  .map((r) => (state.beam && r.id === state.beam.id && r.listeners == null
+    ? { ...r, beamed: true, fromLog: state.beam.from === "log" } : r));
 const deck = () => deckFor(state.live);
 function currentIndex(d = deck()) {
   const i = d.findIndex((r) => r.id === state.currentId);
@@ -231,6 +235,7 @@ function render() {
                        onChip: (id, e) => launch.chip(id, e) });
   renderControls();
   tunnel.draw(); // shows your current room (the tunnel exists before start() first renders)
+  flightLog.observe(); // the ship's log notes boardings; it never draws the radio
 }
 
 // The modules below see the app through this one door.
@@ -242,6 +247,7 @@ const app = {
 };
 const launch = createLaunch(app);
 const fuel = createFuel(app);
+const flightLog = createFlightLog(app);
 // Names cost fuel: read the gauge again once the scan has had time to land.
 const openCrew = () => { showCrew(app, launch); setTimeout(fuel.refresh, 4000); };
 const tunnel = createDock(app);
@@ -274,6 +280,7 @@ function wireLaunch() {
   $("beam").addEventListener("click", () => beamCurrent(app));
   $("dock-btn").addEventListener("click", () => tunnel.open());
   $("fuel").addEventListener("click", () => fuel.open());
+  $("log-btn").addEventListener("click", () => flightLog.open());
   $("open-x").addEventListener("click", launch.openXClick);
   $("open-x").title = "The room on X: everyone aboard. To listen with the radio, use PUSH.";
   if (phone) $("open-x").removeAttribute("target");
@@ -338,7 +345,7 @@ async function start() {
   const saved = readJson(PRESETS_KEY, []);
   const presetList = (Array.isArray(saved) ? saved : []).filter((p) => p && parseSpaceId(p.id) === p.id);
   state = { ...state, presets: presetList, learned: loadLearned(), sort: prefs.sort || "busy",
-            myBands: loadBands(readJson(MYBANDS_KEY, [])),
+            myBands: loadBands(readJson(MYBANDS_KEY, [])), favs: readFavs(readJson(FAVS_KEY, [])),
             scanMin: prefs.scanMin || 5, sfx: prefs.sfx !== false, english: prefs.english !== false };
   $("scan-min").value = String(state.scanMin);
   wire();

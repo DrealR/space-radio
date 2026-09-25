@@ -67,6 +67,17 @@ class SharedAnswerTests(unittest.TestCase):
         self.clock.t += 120
         self.assertEqual([r.id for r in self.source(second).live("guitar")], [ID_B])
 
+    def test_shared_answers_keep_host_ids_and_drop_junk(self):
+        self.source(FakeX([x_item(ID_A, "Guitar hang", 40, host_ids=["7", "8"])])).live("guitar")
+        self.clock.t += 60
+        again = self.source(FakeX([])).live("guitar")
+        self.assertEqual(again[0].host_ids, ("7", "8"))
+        key = next(k for k in self.store._items if k.startswith("answer-"))
+        shelf = self.store.get(key)
+        shelf["rooms"][0]["host_ids"] = ["7", "<script>", None]
+        self.store.set(key, shelf, {"ttl": 3600})
+        self.assertEqual(self.source(FakeX([])).live("guitar")[0].host_ids, ("7",))
+
     def test_out_of_fuel_shows_the_last_rooms_found(self):
         self.source(FakeX([x_item(ID_A)])).live("guitar")
         self.clock.t += SHARED_FRESH_SECONDS + 1

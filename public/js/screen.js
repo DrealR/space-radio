@@ -13,9 +13,10 @@ function screenText(room, s, host) {
   if (!room && !s.liveSearch) return { title: "NO SIGNAL · PROGRAM A PRESET ↓", info: "AUTO-TUNE IS OFF" };
   if (!room && s.english && s.live.length) return { title: "ONLY OTHER LANGUAGES HERE", info: "FLIP EN OFF TO HEAR THEM" };
   if (!room) return { title: "DEAD AIR ON THIS BAND", info: "TRY ANOTHER BAND" };
-  const lead = host ? `HOST @${host}` : "";
+  const lead = [room.fav ? "★ STARRED HOST" : "", host ? `HOST @${host}` : ""].filter(Boolean).join(" · ");
   if (room.beamed && room.listeners == null) {
-    return { title: room.title, info: [lead, "BEAMED IN · PUSH TO JOIN"].filter(Boolean).join(" · ") };
+    const how = room.fromLog ? "FROM YOUR LOG · MAY HAVE ENDED" : "BEAMED IN · PUSH TO JOIN";
+    return { title: room.title, info: [lead, how].filter(Boolean).join(" · ") };
   }
   if (room.source === "yours" && room.listeners == null) {
     const slot = s.presets.findIndex((p) => p.id === room.id) + 1;
@@ -78,6 +79,7 @@ export function renderGlass(d, i, { onSelect, playing, ended }) {
     mark.classList.toggle("at", k === i);
     mark.classList.toggle("playing", room.id === playing);
     mark.classList.toggle("ended", ended.includes(room.id));
+    mark.classList.toggle("fav", Boolean(room.fav));
     mark.addEventListener("click", (e) => { e.stopPropagation(); onSelect(room.id); });
     return mark;
   }));

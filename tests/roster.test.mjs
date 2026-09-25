@@ -4,14 +4,16 @@ import assert from "node:assert/strict";
 import { ROSTER_TTL_MS, addRoster, freshRoster, rosterFrom, withRoster } from "../public/js/roster.js";
 
 const NOW = 1_700_000_000_000;
-const data = { counts: { hosts: 3, speakers: 6 }, listeners: 214, host: { username: "sr26_captain" }, at: NOW };
+const data = { counts: { hosts: 3, speakers: 6 }, listeners: 214, host: { username: "sr26_captain", id: "1000000001" }, at: NOW };
 const room = Object.freeze({ id: "1YqKDqWqdPLxV", title: "t", listeners: 40, hosts: 1, speakers: 2 });
 
 test("keeps only validated counts and a real handle", () => {
-  assert.deepEqual(rosterFrom(data, NOW), { hosts: 3, speakers: 6, listeners: 214, host: "sr26_captain", at: NOW });
-  const junk = rosterFrom({ counts: { hosts: -1, speakers: "8" }, listeners: 1.5, host: { username: "<b>evil</b>" } }, NOW);
-  assert.deepEqual(junk, { hosts: 0, speakers: 0, listeners: 0, host: "", at: NOW });
-  assert.deepEqual(rosterFrom(null, NOW), { hosts: 0, speakers: 0, listeners: 0, host: "", at: NOW });
+  assert.deepEqual(rosterFrom(data, NOW), { hosts: 3, speakers: 6, listeners: 214, host: "sr26_captain", hostId: "1000000001", at: NOW });
+  const junk = rosterFrom({ counts: { hosts: -1, speakers: "8" }, listeners: 1.5, host: { username: "<b>evil</b>", id: "12x" } }, NOW);
+  assert.deepEqual(junk, { hosts: 0, speakers: 0, listeners: 0, host: "", hostId: "", at: NOW });
+  assert.deepEqual(rosterFrom(null, NOW), { hosts: 0, speakers: 0, listeners: 0, host: "", hostId: "", at: NOW });
+  // The id is kept only beside a real handle: favorites pair them.
+  assert.equal(rosterFrom({ host: { username: "<b>", id: "7" } }, NOW).hostId, "");
 });
 
 test("lays the scan over the room while fresh, never editing either", () => {

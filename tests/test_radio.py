@@ -170,6 +170,20 @@ class GatherTests(TmpCase):
         room = XApiSource("tok", Budget(self.dir / "b.json"), fetch=fake).live("music")[0]
         self.assertEqual((room.hosts, room.speakers), (2, 2))
 
+    def test_host_ids_ride_along_in_order_for_favorite_hosts(self):
+        # Already in the paid search's answer: exposing them costs no extra X call.
+        fake = FakeX([x_item(ID_A, host_ids=["22", "11", "22", 33, "bad id", True, "9" * 21])])
+        room = XApiSource("tok", Budget(self.dir / "b.json"), fetch=fake).live("music")[0]
+        self.assertEqual(room.host_ids, ("22", "11", "33"))
+        self.assertEqual(room.to_json()["host_ids"], ["22", "11", "33"])
+
+    def test_host_ids_are_capped_and_default_to_none(self):
+        many = [str(n) for n in range(1, 30)]
+        room = XApiSource("tok", Budget(self.dir / "b.json"),
+                          fetch=FakeX([x_item(ID_A, host_ids=many)])).live("music")[0]
+        self.assertEqual(len(room.host_ids), 10)
+        self.assertEqual(Space(ID_B, "Pasted").to_json()["host_ids"], [])
+
     def test_junk_counts_from_x_become_zero(self):
         fake = FakeX([x_item(ID_A, listeners="lots", host_ids="1", speaker_ids=None)])
         room = XApiSource("tok", Budget(self.dir / "b.json"), fetch=fake).live("music")[0]

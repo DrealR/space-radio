@@ -3,17 +3,21 @@
 
 export const ROSTER_TTL_MS = 600000; // same as crew.js's memo: older names aren't shown
 const HANDLE = /^[A-Za-z0-9_]{1,15}$/;
+const USER_ID = /^[0-9]{1,20}$/;
 
 const count = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
 
-/** The small, validated part of a CrewData we keep. */
+/** The small, validated part of a CrewData we keep. hostId rides only beside a real handle. */
 export function rosterFrom(data, now = Date.now()) {
   const username = data?.host?.username;
+  const handle = typeof username === "string" && HANDLE.test(username) ? username : "";
+  const id = data?.host?.id;
   return Object.freeze({
     hosts: count(data?.counts?.hosts),
     speakers: count(data?.counts?.speakers),
     listeners: count(data?.listeners),
-    host: typeof username === "string" && HANDLE.test(username) ? username : "",
+    host: handle,
+    hostId: handle && typeof id === "string" && USER_ID.test(id) ? id : "",
     at: Number.isFinite(data?.at) ? data.at : now,
   });
 }

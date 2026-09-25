@@ -15,7 +15,7 @@ import urllib.request
 from typing import Callable, Protocol
 
 from .budget import Budget
-from .space import Space, non_negative_int, parse_space_id
+from .space import Space, host_id_list, non_negative_int, parse_space_id
 
 SEARCH_URL = "https://api.x.com/2/spaces/search"
 # host_ids / speaker_ids are plain id lists on the Space (no user lookups, no extra cost).
@@ -148,6 +148,7 @@ def _to_space(item: dict, topic: str) -> Space | None:
         lang=str(item.get("lang") or ""),
         topic=topic,
         source="x-api",
+        host_ids=host_id_list(item.get("host_ids")),
     )
 
 
