@@ -1,6 +1,8 @@
 # Space Radio SR-26
 
-Live: https://space-radio-fm.vercel.app · Code: https://github.com/DrealR/space-radio
+Live: https://space-radio-fm.vercel.app · Code: https://github.com/DrealR/space-radio · MIT licensed
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDrealR%2Fspace-radio&env=X_BEARER_TOKEN&envDescription=Your%20own%20X%20API%20app%27s%20Bearer%20Token%20(pay-per-use%3B%20set%20a%20spending%20limit)&envLink=https%3A%2F%2Fdeveloper.x.com&project-name=space-radio)
 
 A walkie-talkie radio for your ship. Each channel is a live X Space: another ship full of real people talking right now.
 Flip through rooms like a feed, listen while you work, and grab the mic if you want to.
@@ -19,6 +21,38 @@ Built Sep 23, 2026 for winter nights, when the park is too cold. The why: [STORY
 - **SCAN** (computer only) lines up a new room every few minutes; you push to jump.
 - **Presets** save rooms. They live in each person's own browser.
 - Keys: ← → tune · L listen · H I hear it · C crew · O open in X · ? manual · Esc close.
+
+## Run your own
+
+Anyone can run their own Space Radio. It's open source (MIT). You bring your own X API key, and you pay
+X for your own searches; nothing here uses anyone else's key.
+
+1. **Try it with no key** (fake rooms, no network, no cost). You need Python 3.9 or newer and nothing else:
+   ```bash
+   git clone https://github.com/DrealR/space-radio.git && cd space-radio
+   SPACES_RADIO_FAKE=1 python3 -m spaces_radio.server
+   ```
+   Open http://127.0.0.1:8740.
+2. **Get an X API key.** At [developer.x.com](https://developer.x.com), create an app on the pay-per-use plan,
+   add a few dollars of credit, **set a spending limit with auto-recharge off**, and copy the app's
+   **Bearer Token**. Only the Bearer Token is needed; the radio reads public Spaces and never acts as you.
+3. **Deploy.** Use the **Deploy with Vercel** button above, or `vercel deploy --prod` from a clone. Paste
+   your Bearer Token as `X_BEARER_TOKEN` when Vercel asks (Project Settings → Environment Variables).
+   Optional caps are in [`.env.example`](.env.example).
+4. **Keep your token private.** It lives only in Vercel's environment (or a local `.env`, which git ignores).
+   Never put it in code, commits, issues or screenshots. If it leaks, regenerate it in the X console.
+
+Docking and the shared fuel ledger use Vercel's Runtime Cache, which needs no extra setup or account.
+
+## Contributing
+
+Issues and pull requests are welcome. Keep the spirit: real people, live; no feeds, follower graphs or
+leaderboards; and every paid feature shows its cost. Before a PR, run both test suites (no network, no key):
+
+```bash
+python3 -m unittest discover -s tests -t .
+node --test tests/*.mjs
+```
 
 ## The two-key launch
 
@@ -51,7 +85,7 @@ blinking violet) and teaches key 2 in the airlock panel. Only you can put it **O
 ## Run it locally
 
 ```bash
-cd ~/Morrow/showcase/spaces-radio && python3 -m spaces_radio.server
+python3 -m spaces_radio.server                       # live rooms if X_BEARER_TOKEN is set in the environment
 SPACES_RADIO_FAKE=1 python3 -m spaces_radio.server   # fake rooms and a fake crew: no key, no network, no cost
 ```
 
@@ -65,7 +99,7 @@ exercise the "ended" and "busy" crew states. It is ignored on Vercel.
 - The X key lives only in the Vercel environment (`X_BEARER_TOKEN`). Listeners never need a key.
 - **One key, many listeners.** `/api/tune` and `/api/search` answers carry `Vercel-CDN-Cache-Control: max-age=1800`,
   so everyone on the same band in the same 30 minutes shares one answer, and X is asked once.
-  (Every deploy clears that cache, so a deploy costs one fresh search per band someone opens.)
+  Behind the CDN, each word's answer is also kept in the Runtime Cache for an hour, and that survives deploys.
   Any extra query parameter, or any other spelling of the same one (`%6dusic`, a trailing `&`), is refused,
   so nobody can bypass that cache and run up the bill.
 - Add the key: `vercel env add X_BEARER_TOKEN production`, paste the token, then redeploy.
