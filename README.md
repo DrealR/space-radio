@@ -87,6 +87,19 @@ wall and spoke in chords. **DOCK ⟷** does that for two radios:
   fallback); locally it's memory. A third radio gets DOCK FULL; UNDOCK frees the slot; idle slots
   expire after 30 minutes. Nothing touches X, so docking has no X cost.
 
+## Fuel: what spends money, and the gauge that shows it
+
+- **⛽ gauge** (next to ◎ RADAR) shows today's estimated X spend against the day's cap. Tap it for the
+  fuel log: spend by kind, a cost sheet, and what's always free. `GET /api/fuel` serves it (no X, no cache).
+- **One shared tank.** The band, crew-room and crew-name ledgers live in Vercel's Runtime Cache, so every
+  instance adds up to one real daily cap: 60¢ bands + 10¢ crew rooms + 40¢ names = **$1.10/day** by default
+  (`SPACES_RADIO_DAILY_CAP`, `SPACES_RADIO_CREW_SPACE_CAP`, `SPACES_RADIO_CREW_DAILY_CAP`).
+- **One paid search per word per hour.** Each word's rooms are shared from the Runtime Cache for an hour
+  (surviving deploys) and kept six hours as a fallback: when fuel or X credits run out, the dial shows the
+  last rooms found.
+- **Priciest tap:** WHO'S HERE, at about 1¢ per person (a busy room is 10–15¢). OPEN IN X shows the same
+  crew for free.
+
 ## What it costs
 
 X's API is pay-per-use: **$0.005 per room returned**. The docs say each room is billed once per UTC day,
