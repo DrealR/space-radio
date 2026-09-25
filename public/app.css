@@ -147,10 +147,10 @@ a { color: inherit; }
 
 .desk {
   display: grid; gap: 40px; justify-content: center; align-items: start;
-  padding: 44px 16px 64px; grid-template-columns: minmax(0, 440px);
+  padding: 22px 16px 40px; grid-template-columns: minmax(0, 440px);
 }
 @media (min-width: 980px) {
-  .desk { grid-template-columns: 440px 380px; gap: 56px; padding-top: 72px; }
+  .desk { grid-template-columns: 440px 380px; gap: 56px; padding-top: 34px; }
   .manual { position: sticky; top: 32px; }
 }
 

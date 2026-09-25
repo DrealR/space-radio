@@ -1,0 +1,60 @@
+/* The page around the radio: seamless sky, the top bar, the pilot's card, the footer. */
+
+/* Seamless edges: the canvas is the night sky, and the page doesn't rubber-band past it. */
+html { background: var(--sky); overscroll-behavior: none; }
+body { overscroll-behavior: none; }
+
+.topbar { max-width: 876px; margin: 0 auto; padding: 18px 16px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tb-brand { display: flex; align-items: center; gap: 10px; color: #f4ecd9; text-decoration: none; }
+.tb-brand img { border-radius: 7px; box-shadow: 0 0 0 1px rgba(255, 159, 90, .35); }
+.tb-brand b { display: block; font: 15px/1 Bungee, var(--mono); letter-spacing: .02em; }
+.tb-brand small { display: block; margin-top: 4px; font: 11px var(--mono); color: #bfae94; }
+.tb-links { display: flex; gap: 4px; }
+.tb-links a { color: #e8dcc2; text-decoration: none; font: 700 11px var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  padding: 8px 10px; border-radius: 8px; }
+.tb-links a:hover { background: rgba(255, 255, 255, .07); }
+.tb-links .tb-how { color: #1a120d; background: var(--mustard); }
+.tb-links .tb-how:hover { background: #ffc94a; }
+.tb-links a, .tb-brand b { white-space: nowrap; }
+@media (max-width: 560px) {
+  .topbar { padding-top: 14px; }
+  .tb-brand small { display: none; }
+  .tb-brand b { font-size: 13px; }
+  .tb-links a { padding: 8px 7px; letter-spacing: .08em; }
+}
+@media (max-width: 400px) {
+  .tb-links a:not(.tb-how) { display: none; } /* Story and Code are in the card and the footer */
+}
+
+/* The pilot's card: three steps, six chips, everything else folded. */
+.card-kicker { margin: 0; font: 700 11px var(--mono); letter-spacing: .3em; text-transform: uppercase; color: var(--orange); }
+.manual h1 { margin-top: 4px; }
+.fly { list-style: none; padding: 0; margin: 14px 0 16px; display: grid; gap: 10px; }
+.fly li { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; }
+.fly-n { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 16px Bungee, var(--mono);
+  background: var(--paper-ink); color: var(--paper); box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.fly p { margin: 2px 0 0; font-size: 13px; line-height: 1.5; }
+.fly b { font-weight: 700; }
+.chips { list-style: none; padding: 0; margin: 0 0 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.chips li { padding: 8px 9px; border-radius: 6px; background: rgba(43, 34, 27, .06); box-shadow: inset 0 0 0 1px rgba(43, 34, 27, .12); }
+.chips b { display: block; font: 700 10px var(--mono); letter-spacing: .12em; }
+.chips span { display: block; margin-top: 3px; font-size: 11px; line-height: 1.35; opacity: .8; }
+.manual .legend { margin: 6px 0 12px; font-size: 11px; opacity: .8; }
+details.more { border-top: 2px dashed rgba(43, 34, 27, .25); padding: 10px 0 2px; }
+details.more summary { cursor: pointer; list-style: none; font: 700 12px var(--mono); letter-spacing: .16em; text-transform: uppercase;
+  display: flex; justify-content: space-between; align-items: center; min-height: 32px; }
+details.more summary::-webkit-details-marker { display: none; }
+details.more summary::after { content: "+"; font-size: 16px; color: var(--orange); transition: transform .2s; }
+details.more[open] summary::after { transform: rotate(45deg); }
+details.more > *:not(summary) { font-size: 12.5px; }
+.manual .small { font-size: 11.5px; opacity: .8; }
+
+/* The footer under everything. */
+.site-foot { max-width: 876px; margin: 0 auto; padding: 8px 16px 40px; text-align: center; color: #bfae94; font: 12px/1.6 var(--mono); }
+.site-foot a { color: #ffd9a8; }
+.site-foot .small { font-size: 11px; opacity: .75; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .tb-brand, :root:not([data-theme="dark"]) .tb-links a:not(.tb-how) { color: #2a221c; }
+  :root:not([data-theme="dark"]) .site-foot { color: #5a4b3b; }
+  :root:not([data-theme="dark"]) .site-foot a { color: #9a3a0c; }
+}

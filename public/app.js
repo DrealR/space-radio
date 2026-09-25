@@ -210,7 +210,7 @@ function renderControls() {
   $("en-on").checked = state.english;
   const trouble = state.problems.length ? ` Trouble: ${state.problems.join(" ")}` : "";
   $("foot").textContent = (state.liveSearch
-    ? "Auto-tune is on. Live rooms come from the X API and are shared by every listener, refreshed every 10 minutes."
+    ? "Auto-tune is on. Live rooms come from X; each band's answer is shared by every listener for an hour."
     : "Auto-tune is off: this radio has no X API key yet, so it plays the presets you program.") + trouble;
 }
 
