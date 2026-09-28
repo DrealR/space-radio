@@ -35,6 +35,16 @@ INSTANCE = secrets.token_hex(4)  # this server process: two Vercel instances can
 _serials = itertools.count()
 
 
+def _new_process() -> None:
+    """A forked worker is a process of its own: it must never mint its parent's (or a sibling's) keys."""
+    global INSTANCE, _serials
+    INSTANCE, _serials = secrets.token_hex(4), itertools.count()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_new_process)
+
+
 def mint(prefix: str = "") -> str:
     """A key no other call, in this process or another instance, will ever mint."""
     return f"{prefix}{INSTANCE}.{next(_serials)}"

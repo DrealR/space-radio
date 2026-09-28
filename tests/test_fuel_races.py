@@ -5,10 +5,12 @@ import contextlib
 import io
 import json
 import multiprocessing
+import os
 import threading
 import time
 import unittest
 
+from spaces_radio import budget
 from spaces_radio.budget import PRICE_PER_SPACE, PRICE_PER_USER, Budget
 from spaces_radio.crew import CrewError, CrewLookup
 from spaces_radio.dock import MemoryStore
@@ -342,6 +344,27 @@ class StrictLeaseTests(unittest.TestCase):
             self.assertEqual([p.exitcode for p in procs], [0, 0])
             leases = list(results)
         self.assertEqual(sorted(lease is not None for lease in leases), [False, True])
+
+
+class ForkedInstanceTests(unittest.TestCase):
+    """budget.INSTANCE is minted at import. A server that forks workers after that (Linux's default
+    for multiprocessing, a preloading worker pool) handed every child its parent's id and serials,
+    so two workers minted the same lease and hold keys: both saw a lease as their own (CI, Sep 28)."""
+
+    @unittest.skipUnless(hasattr(os, "fork"), "no fork on this platform")
+    def test_a_forked_worker_never_mints_its_parents_keys(self):
+        read, write = os.pipe()
+        pid = os.fork()
+        if pid == 0:  # the child: report the next key it would mint, then leave at once
+            os.close(read)
+            os.write(write, budget.mint("k-").encode())
+            os._exit(0)
+        os.close(write)
+        theirs = os.read(read, 200).decode()
+        os.close(read)
+        os.waitpid(pid, 0)
+        self.assertTrue(theirs)
+        self.assertNotEqual(theirs, budget.mint("k-"), "a forked worker minted its parent's next key")
 
 
 class BilledRoomTests(TmpCase):
