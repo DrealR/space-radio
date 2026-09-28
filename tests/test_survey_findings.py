@@ -4,7 +4,8 @@ One test per finding, each named for what a listener notices, each decorated
 @unittest.expectedFailure so the suite stays green: remove a decorator to watch
 that one fail, then put it back. No network and no key: X, the shared relay and
 the budgets are the same fakes the other suites use (tests/test_radio.py,
-tests/test_fuel_races.py, tests/test_dock.py). Nothing here is fixed yet.
+tests/test_fuel_races.py, tests/test_dock.py). The crew cache and the long room id
+are fixed now and their tests run for real; the rest still stand.
 """
 import contextlib
 import http.client

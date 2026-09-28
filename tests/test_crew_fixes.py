@@ -105,6 +105,41 @@ class TrustedAfterHostOnlyTests(TmpCase):
         self.assertEqual((answers[True][0].mode, len(answers[True][0].crew)), ("full", 3))
 
 
+class HeldScanTests(TmpCase):
+    """A listener who got the room from the dial and cannot start a scan of its own (X is
+    holding the whole app, or the day's names are spent) gets the host the room already
+    has, not an error: the host is better than nothing."""
+
+    def make(self, fake, crew_cap=0.5, space_cap=1.0):
+        self.clock = Clock()
+        self.spaces = Budget(self.dir / "s.json", daily_cap=space_cap, clock=lambda: DAY)
+        self.users = Budget(self.dir / "u.json", daily_cap=crew_cap, clock=lambda: DAY, price=PRICE_PER_USER)
+        return CrewLookup("tok", self.spaces, self.users, fetch=fake, now=self.clock,
+                          log=lambda line: None)
+
+    def test_a_held_app_serves_the_cached_host_to_a_ticketed_listener(self):
+        fake = FakeCrewX(crew_body())
+        crew = self.make(fake)
+        crew.scan(SID, trusted=False)          # a preset, a pasted link: the host is cached
+        crew._hold_after("credits")            # X refused the whole app for a while
+        names, rooms = self.users.ledger().spent, self.spaces.ledger().spent
+        scan, cached = crew.scan(SID, trusted=True)   # the dial's own room, ticket and all
+        self.assertEqual((scan.mode, cached, len(scan.crew)), ("host-only", True, 1))
+        self.assertEqual(len(fake.urls), 2)
+        self.assertEqual((self.users.ledger().spent, self.spaces.ledger().spent), (names, rooms))
+
+    def test_a_spent_names_cap_serves_the_cached_host_to_a_ticketed_listener(self):
+        fake = FakeCrewX(crew_body())
+        crew = self.make(fake, crew_cap=0.05)
+        crew.scan(SID, trusted=False)
+        self.users.charge([f"earlier-{i}" for i in range(4)])   # the day's names are spent
+        spent, rooms = self.users.ledger().spent, self.spaces.ledger().spent
+        scan, cached = crew.scan(SID, trusted=True)
+        self.assertEqual((scan.mode, cached, len(scan.crew)), ("host-only", True, 1))
+        self.assertEqual(len(fake.urls), 2)
+        self.assertEqual((self.users.ledger().spent, self.spaces.ledger().spent), (spent, rooms))
+
+
 class RoomIdTests(TmpCase):
     def service(self, fake):
         spaces = Budget(self.dir / "s.json", daily_cap=1.0, clock=lambda: DAY)

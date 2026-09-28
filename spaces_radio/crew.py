@@ -16,7 +16,9 @@ Several requests can arrive at once. Each paid step reserves its worst case unde
 a lock before X is called and settles what X billed afterwards. A request for a room
 that is already being scanned waits for that scan instead of paying again. A roster
 named for the host alone is never the answer for a request that came with a ticket:
-that request pays for a scan of its own, and its roster is the one the room keeps.
+that request pays for a scan of its own, and its roster is the one the room keeps,
+unless no scan is possible right now (X is holding the app, the day's names are spent)
+and the host the room already has is still better than an error.
 After X refuses the whole app (busy, out of credits, bad key), nobody asks again for a while.
 """
 from __future__ import annotations
@@ -118,8 +120,15 @@ class CrewLookup:
                 flight = self._flights.get(sid)
                 leading = flight is None
                 if leading:
-                    self._check_hold(at)
-                    self._floor(sid)
+                    try:
+                        self._check_hold(at)
+                        self._floor(sid)
+                    except CrewError:
+                        # It cannot lead a scan (X is holding the app, the day's names are
+                        # spent). A roster the room already has beats an error, so serve it.
+                        if hit and at - hit[0] < _ttl(hit[1]):
+                            return hit[1], True
+                        raise
                     flight = _Flight()
                     self._flights = {**self._flights, sid: flight}
             if leading:
