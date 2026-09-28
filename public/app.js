@@ -372,6 +372,7 @@ async function start() {
 
 // Asks the tower for its bands. On failure the presets still play, and it asks again later.
 async function tuneIn(prefs) {
+  const startedOn = state.band; // the band the radio is on while the tower thinks
   const status = await api("/api/status");
   if (status.error) {
     set({ loading: false, problems: [status.error] });
@@ -382,8 +383,16 @@ async function tuneIn(prefs) {
   set({ bands, liveSearch: status.data.live_search, problems: [] });
   const known = (b) => bands.includes(b) || Boolean(findBand(state.myBands, b));
   const beam = readBeam(location.search, (b) => bands.includes(b));
-  await tuneBand(beam?.band || (known(prefs.band) ? prefs.band : bands[0]));
-  if (beam) landBeam(app, beam);
+  // A start that lands late, or in a tab nobody is looking at, spends nothing: a band the
+  // listener chose while the tower thought is their own, already bought, and a hidden tab
+  // asks again in a minute rather than buying a search no one is watching.
+  if (state.band === startedOn) {
+    if (document.hidden) setTimeout(() => tuneIn(prefs), RETRY_STATUS_MS);
+    else {
+      await tuneBand(beam?.band || (known(prefs.band) ? prefs.band : bands[0]));
+      if (beam) landBeam(app, beam);
+    }
+  }
   // A docking link opens the tunnel; otherwise a reload picks up this tab's dock, if any.
   const dockToken = readDock(location.search);
   if (dockToken) {

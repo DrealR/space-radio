@@ -47,5 +47,9 @@ export function wireKnob(knob, step, detent) {
     dragged = false;
     if (!skip) step(1);
   });
-  knob.addEventListener("wheel", (e) => { e.preventDefault(); step(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+  knob.addEventListener("wheel", (e) => {
+    if (e.ctrlKey || e.metaKey) return; // the browser's own zoom gesture, not a tune
+    e.preventDefault();
+    step(e.deltaY > 0 ? 1 : -1);
+  }, { passive: false });
 }

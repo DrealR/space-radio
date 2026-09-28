@@ -1,6 +1,6 @@
 // node --test tests/*.mjs — the Sky Survey's findings for the radio page.
-// Every test here is written as a user would notice it, and is `todo: true`: this order only
-// finds and proves, it does not fix. Take the `todo` off one at a time to watch it fail.
+// Every test here is written as a user would notice it. They came in `todo: true` and stayed
+// that way while the order only found and proved; the fixes have landed and each one runs.
 // Pure modules are imported; app.js is loaded the way tests/tune-race.test.mjs does it, by
 // slicing the function out of the source and running it against a fake page.
 import test from "node:test";
@@ -53,19 +53,21 @@ function makeRadio({ hidden, answer }) {
     REFRESH_MS: 1800000,
   };
   const names = Object.keys(env);
-  const tuneIn = new Function("initial", "setTimeout", "setInterval", ...names, `
+  // The radio keeps its own state, so set() here moves the band the listener pressed: a fake that
+  // kept a second copy would hide the very race this page is about.
+  const radio = new Function("initial", "setTimeout", "setInterval", ...names, `
     let state = initial;
     const set = (patch) => { state = { ...state, ...patch }; };
     ${tuneInSource}
-    return tuneIn;
+    return { tuneIn, set, get state() { return state; } };
   `)(state, (fn) => { timers.push(fn); return timers.length; }, () => 0, ...names.map((k) => env[k]));
-  return { tuneIn, set, timers, spends, get state() { return state; } };
+  return { tuneIn: radio.tuneIn, set: radio.set, timers, spends, get state() { return radio.state; } };
 }
 
 const okStatus = { data: { stations: ["anything", "music", "late night"], live_search: true }, meta: {} };
 
 test("starting up late never re-tunes the band the listener moved to, and never spends a search in a hidden tab",
-  { todo: true }, async () => {
+  async () => {
     // The tower is slow. While it thinks, the listener presses a band key of their own.
     let reply = null;
     const slow = makeRadio({ hidden: false, answer: () => new Promise((done) => { reply = () => done(okStatus); }) });
@@ -87,7 +89,7 @@ test("starting up late never re-tunes the band the listener moved to, and never 
   });
 
 // ---- 2. the crew manifest's PUSH (aboard.js) ------------------------------------------------
-test("PUSH in the crew manifest never boards a room the manifest does not name", { todo: true }, () => {
+test("PUSH in the crew manifest never boards a room the manifest does not name", () => {
   const A = { id: "1YqKDqWqdPLxV", title: "Night owls" };
   const B = { id: "1OwxWzXyLbJQ", title: "Morning show" };
   let state = { air: { phase: "idle", roomId: null }, currentId: A.id, rosters: {}, ended: [], learned: { crew: true } };
@@ -109,13 +111,17 @@ test("PUSH in the crew manifest never boards a room the manifest does not name",
   const opts = crewOptions(app, launch, A);
   state = { ...state, currentId: B.id };
   deck = [B];
-  opts.listen.onClick({ preventDefault() {} });
+  const click = { preventDefault() {} };
+  opts.listen.onClick(click);
 
-  assert.deepEqual(calls, [["select", A.id], ["push"]], "the needle goes back to the room the manifest names");
+  // PUSH still gets the click itself: the crew's PUSH is a link, and launch.push needs the event
+  // to stop it following and to read the modifier keys.
+  assert.deepEqual(calls, [["select", A.id], ["push", click]],
+    "the needle goes back to the room the manifest names");
 });
 
 // ---- 3. the TUNE knob (knob.js) -------------------------------------------------------------
-test("ctrl+scroll over the TUNE knob zooms the page instead of tuning a room", { todo: true }, () => {
+test("ctrl+scroll over the TUNE knob zooms the page instead of tuning a room", () => {
   const handlers = {};
   const knob = {
     addEventListener: (type, fn) => { handlers[type] = fn; },
@@ -123,14 +129,15 @@ test("ctrl+scroll over the TUNE knob zooms the page instead of tuning a room", {
   };
   let steps = 0;
   wireKnob(knob, () => { steps += 1; }, () => {});
-  const zoom = { deltaY: 120, ctrlKey: true, preventDefault() { this.defaultPrevented = true; } };
+  // A real WheelEvent arrives with defaultPrevented false; only a call to preventDefault sets it.
+  const zoom = { deltaY: 120, ctrlKey: true, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
   handlers.wheel(zoom);
   assert.equal(zoom.defaultPrevented, false, "the browser keeps its zoom gesture");
   assert.equal(steps, 0, "a zoom gesture never tunes a room");
 });
 
 // ---- 4. the ORDER keys (keys.js + index.html) -----------------------------------------------
-test("the arrow keys move the ORDER choice instead of tuning the radio", { todo: true }, () => {
+test("the arrow keys move the ORDER choice instead of tuning the radio", () => {
   const calls = [];
   wireKeys({
     blocked: () => false,
