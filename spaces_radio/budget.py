@@ -29,7 +29,7 @@ PRICE_PER_SPACE = 0.005
 PRICE_PER_USER = 0.010          # every user in includes.users is billed
 DEFAULT_DAILY_CAP = 0.60        # dollars; ~120 rooms returned a day (every request counts)
 DEFAULT_CREW_DAILY_CAP = 0.40   # dollars; ~40 names a day (a full crew is ~9-15)
-DEFAULT_CREW_SPACE_CAP = 0.10   # dollars; ~20 rooms a day looked up by name, off the dial's ledger
+DEFAULT_CREW_SPACE_CAP = 0.10   # dollars; ~10 rooms a day looked up by name (two reads each), off the dial's ledger
 
 INSTANCE = secrets.token_hex(4)  # this server process: two Vercel instances can share a pid, never this
 _serials = itertools.count()
@@ -54,10 +54,15 @@ class Ledger:
     paid_ids: frozenset = field(default_factory=frozenset)
     calls: int = 0
     price: float = PRICE_PER_SPACE
+    counted: int = 0  # items tallied without ids (the shared tank keeps counts, not ids)
+
+    @property
+    def items(self) -> int:
+        return len(self.paid_ids) + self.counted
 
     @property
     def spent(self) -> float:
-        return round(len(self.paid_ids) * self.price, 4)
+        return round(self.items * self.price, 4)
 
 
 class Budget:
@@ -124,7 +129,7 @@ class Budget:
         with self._lock:
             led = self.ledger()
         return {"day": led.day, "spent": led.spent, "cap": self._cap,
-                "calls": led.calls, "spaces_paid": len(led.paid_ids)}
+                "calls": led.calls, "spaces_paid": led.items}
 
     def _fits(self, led: Ledger, count: int) -> bool:
         return led.spent + count * self._price <= self._cap + 1e-9

@@ -10,15 +10,19 @@ again. Now both live in one shared store (Vercel's Runtime Cache; plain memory l
   Fresh means free for everyone; stale is what the dial shows when fuel or X credits run out.
 
 The store can only get and set: no compare-and-set, no counter. Two instances writing at once
-would each replace the other's ledger, so three habits keep a race from losing money (Sep 28,
-found by the Sky Survey):
+would each replace the other's ledger, so four habits keep a race from losing money (Sep 28,
+found by the Sky Survey, tightened after review):
 
-- The ledger is a Tank that only grows: spending adds keys, and a hold given back is added to
-  `freed`, never deleted. Two copies merge by union, so an instance never trades what it knows
-  for an older copy, and a record another write covered up goes back in when its owner looks.
+- The ledger is a Tank of tallies, one per writer. A writer only ever raises its own numbers
+  and copies merge by taking the larger of each, so no write lands "backwards", and every copy
+  carries every tally its writer has seen: a tally another write covered up comes back with
+  the next write from anyone who saw it. It stays small: a few numbers per instance.
+- Nothing is written after a failed read (that copy could be old), and no fuel is granted
+  while the tank can't be read. Spending still counts in memory and goes out with the next write.
 - A hold is announced, then checked: write it, wait a beat, read again. If another instance's
   hold landed meanwhile and together they pass the cap, back off. Of two instances reserving
-  the last fuel at once, at most one keeps it (both may back off: that fails closed).
+  the last fuel at once, at most one keeps it (both may back off: that fails closed). A charge
+  is looked at again after the same beat, so a write that covered it up gets undone.
 - A word being bought carries a short lease: a second instance waits for that answer instead
   of paying for the same search.
 
@@ -30,20 +34,20 @@ from __future__ import annotations
 import hashlib
 import sys
 import time
-from dataclasses import dataclass, replace
-from typing import Callable, Optional
+from dataclasses import dataclass, field, replace
+from typing import Callable, NamedTuple, Optional
 
-from .budget import INSTANCE, PRICE_PER_SPACE, Budget, Ledger, hold_keys, mint, utc_day
+from .budget import PRICE_PER_SPACE, Budget, Ledger, hold_keys, mint, utc_day
 from .space import Space, host_id_list
 
 FRESH_SECONDS = 3600        # one paid search per word per hour, whoever asks
 KEEP_SECONDS = 6 * 3600     # stale rooms stay available this long as a fallback
 LEDGER_SECONDS = 2 * 86400  # a day's ledger outlives its day, for the fuel card
-RECHECK_SECONDS = 0.1       # the beat between announcing a hold or a lease and looking again
+RECHECK_SECONDS = 0.1       # the beat between announcing a hold, charge or lease and looking again
 PUBLISH_TRIES = 3           # writes that keep getting covered up before we log it and move on
 LEASE_SECONDS = 15          # a word's search lease; X answers within 10 s or times out
-WAIT_POLLS = 48             # a second instance checks for the first one's answer this often...
-POLL_SECONDS = 0.25         # ...this far apart (12 s in all)
+WAIT_POLLS = 20             # a second instance checks for the first one's answer this often...
+POLL_SECONDS = 0.25         # ...this far apart (5 s in all, inside Vercel's 30 s per request)
 StoreGetter = Callable[[], Optional[object]]
 Pause = Callable[[float], None]
 
@@ -52,138 +56,171 @@ def _warn(what: str, err: Exception) -> None:
     print(f"[spaces-radio] fuel {what}: {type(err).__name__}: {err}", file=sys.stderr)
 
 
-def _strings(raw) -> frozenset:
-    return frozenset(str(i) for i in raw) if isinstance(raw, list) else frozenset()
+def _count(raw) -> int:
+    return raw if isinstance(raw, int) and not isinstance(raw, bool) and raw > 0 else 0
+
+
+class Tally(NamedTuple):
+    """One writer's day. Every number only grows."""
+    spent: int = 0      # items X billed
+    held: int = 0       # items ever held for calls in flight
+    returned: int = 0   # held items given back (settled or released)
+    calls: int = 0      # paid calls
+
+    def merge(self, other: "Tally") -> "Tally":
+        return Tally(*(max(a, b) for a, b in zip(self, other)))
+
+    @property
+    def items(self) -> int:
+        return self.spent + max(0, self.held - self.returned)
 
 
 @dataclass(frozen=True)
 class Tank:
-    """One day of spending in a form any two copies can combine: nothing is ever taken out."""
+    """One day of spending: a tally per writer. Replaced whole, never edited."""
     day: str
-    added: frozenset = frozenset()   # every key ever charged or held today
-    freed: frozenset = frozenset()   # holds given back (settled or released)
-    calls: frozenset = frozenset()   # one token per paid call
+    tallies: dict = field(default_factory=dict)  # writer -> Tally
 
     def merge(self, other: Optional["Tank"]) -> "Tank":
         if other is None or other.day != self.day:
             return self
-        return Tank(self.day, self.added | other.added, self.freed | other.freed, self.calls | other.calls)
+        writers = set(self.tallies) | set(other.tallies)
+        return Tank(self.day, {w: self.tallies.get(w, Tally()).merge(other.tallies.get(w, Tally()))
+                               for w in writers})
 
     def covers(self, other: "Tank") -> bool:
-        return other.added <= self.added and other.freed <= self.freed and other.calls <= self.calls
+        """True when this copy already knows everything `other` knows."""
+        return all(self.tallies.get(w, Tally()).merge(t) == self.tallies.get(w, Tally())
+                   for w, t in other.tallies.items())
 
-    def hold(self, keys) -> "Tank":
-        return replace(self, added=self.added | frozenset(keys))
-
-    def free(self, keys) -> "Tank":
-        return replace(self, freed=self.freed | frozenset(keys))
-
-    def spend(self, ids) -> "Tank":
-        """One paid call: each id it billed gets its own key, even if another call paid it today."""
-        call = mint("call-")
-        return replace(self, added=self.added | frozenset(f"{call}:{i}" for i in ids),
-                       calls=self.calls | {call})
+    def bump(self, writer: str, **more: int) -> "Tank":
+        now = self.tallies.get(writer, Tally())
+        return Tank(self.day, {**self.tallies, writer: now._replace(
+            **{k: getattr(now, k) + v for k, v in more.items()})})
 
     def ledger(self, price: float) -> Ledger:
-        return Ledger(day=self.day, paid_ids=self.added - self.freed, calls=len(self.calls), price=price)
+        tallies = self.tallies.values()
+        return Ledger(day=self.day, counted=sum(t.items for t in tallies),
+                      calls=sum(t.calls for t in tallies), price=price)
 
     def to_json(self) -> dict:
-        # "paid_ids" and a numeric "calls" keep the previous version reading during a deploy
-        # (it counts given-back holds as spent, which errs toward stopping).
-        return {"paid_ids": sorted(self.added), "freed": sorted(self.freed),
-                "calls": len(self.calls), "call_ids": sorted(self.calls)}
+        led = self.ledger(PRICE_PER_SPACE)
+        # "paid_ids" and a numeric "calls" keep the previous version counting during a deploy.
+        return {"tallies": {w: list(t) for w, t in sorted(self.tallies.items())},
+                "paid_ids": [f"n{i}" for i in range(led.items)], "calls": led.calls}
 
     @classmethod
     def from_json(cls, day: str, raw) -> Optional["Tank"]:
-        if not isinstance(raw, dict) or not isinstance(raw.get("paid_ids"), list):
+        if not isinstance(raw, dict):
             return None
-        calls = _strings(raw.get("call_ids"))
-        if not calls:  # written by the previous version: rebuild its count as stable tokens
-            count = raw.get("calls")
-            count = count if isinstance(count, int) and not isinstance(count, bool) else 0
-            calls = frozenset(f"legacy-{i}" for i in range(max(0, count)))
-        return cls(day, _strings(raw["paid_ids"]), _strings(raw.get("freed")), calls)
+        tallies = raw.get("tallies")
+        if isinstance(tallies, dict):
+            return cls(day, {str(w): Tally(*(_count(n) for n in t[:4]))
+                             for w, t in tallies.items() if isinstance(t, list)})
+        if isinstance(raw.get("paid_ids"), list):  # written by the previous version: one fixed tally
+            return cls(day, {"legacy": Tally(spent=len(raw["paid_ids"]), calls=_count(raw.get("calls")))})
+        return None
 
 
 class SharedBudget(Budget):
     """A Budget whose tank lives in the shared store. If the store is unreachable it keeps
-    counting in memory, so an outage can undercount but never unblocks spending by itself."""
+    counting in memory and grants no new fuel until it can read the tank again."""
 
     def __init__(self, name: str, store: StoreGetter, daily_cap: float, clock=utc_day,
                  price: float = PRICE_PER_SPACE, pause: Pause = time.sleep):
         self._name = name
         self._shared = store
         self._pause = pause
+        self._writer = mint("tank-")      # this budget's own tally; nobody else writes it
+        self._given_back = frozenset()    # holds already returned, so returning one twice counts once
         super().__init__(path=None, daily_cap=daily_cap, clock=clock, price=price)
 
     def ledger(self) -> Ledger:
         with self._lock:
-            return self._look().ledger(self._price)
-
-    def charge(self, space_ids) -> Ledger:
-        return self._change(lambda tank: tank.spend(space_ids))
+            return self._look()[0].ledger(self._price)
 
     def try_reserve(self, count: int, tag: str = "") -> Optional[frozenset]:
         keys = hold_keys(count, tag)
         with self._lock:
-            if not self._fits(self._look().ledger(self._price), len(keys)):
+            tank, readable = self._look()
+            if not readable or not self._fits(tank.ledger(self._price), len(keys)):
                 return None
-            self._tank = self._tank.hold(keys)
+            self._tank = tank.bump(self._writer, held=len(keys))
             self._publish()
         self._pause(RECHECK_SECONDS)  # announced; now give a racing instance's hold time to land
         with self._lock:
-            if self._look().ledger(self._price).spent <= self._cap + 1e-9:
+            tank, readable = self._look()
+            if readable and tank.ledger(self._price).spent <= self._cap + 1e-9:
                 return keys
-            self._tank = self._tank.free(keys)
-            self._publish()
+            self._tank = self._give_back(tank, keys)
+            if readable:
+                self._publish()
             return None
 
+    def charge(self, space_ids) -> Ledger:
+        return self._change(lambda tank: tank.bump(self._writer, spent=len(frozenset(space_ids)), calls=1))
+
     def settle(self, held, billed) -> Ledger:
-        return self._change(lambda tank: tank.free(held).spend(billed))
+        return self._change(lambda tank: self._give_back(tank, held).bump(
+            self._writer, spent=len(frozenset(billed)), calls=1))
 
     def release(self, held) -> Ledger:
-        return self._change(lambda tank: tank.free(held))
+        return self._change(lambda tank: self._give_back(tank, held), recheck=False)
 
-    def _change(self, step: Callable[[Tank], Tank]) -> Ledger:
+    def _change(self, step: Callable[[Tank], Tank], recheck: bool = True) -> Ledger:
         with self._lock:
-            self._tank = step(self._look())
-            self._publish()
-            return self._tank.ledger(self._price)
+            tank, readable = self._look()
+            self._tank = step(tank)  # counted in memory either way
+            if readable:
+                self._publish()
+            led = self._tank.ledger(self._price)
+        if readable and recheck:  # a write that covered this one up in the meantime gets undone
+            self._pause(RECHECK_SECONDS)
+            with self._lock:
+                self._look()
+        return led
+
+    def _give_back(self, tank: Tank, held) -> Tank:
+        fresh = frozenset(held) - self._given_back
+        self._given_back = self._given_back | fresh
+        return tank.bump(self._writer, returned=len(fresh))
 
     # ---- the store (called with self._lock held) ------------------------------------------------
     def _key(self, day: str) -> str:
         return f"fuel-{self._name}-{day}"
 
-    def _look(self) -> Tank:
-        """Today's tank: what we know merged with what the store holds. If the store lost
-        something we know (another write covered it, or it was evicted), put it back."""
+    def _look(self) -> tuple[Tank, bool]:
+        """Today's tank, what we know merged with what the store holds, and whether the store
+        could be read. If it was read and lacks something we know, put that back."""
         today = self._clock()
         mine = self._tank if self._tank.day == today else Tank(today)
-        stored = self._read(today)
+        readable, stored = self._read(today)
         self._tank = mine.merge(stored)
-        if mine.added and (stored is None or not stored.covers(mine)):
+        if readable and not (stored or Tank(today)).covers(self._tank):
             self._publish()
-        return self._tank
+        return self._tank, readable
 
     def _publish(self) -> None:
         """Write our tank and read it back; if another write landed on ours, merge and try again."""
         for _ in range(PUBLISH_TRIES):
             if not self._write(self._tank):
-                return  # the store is down: keep counting in memory
-            stored = self._read(self._tank.day)
-            if stored is None or stored.covers(self._tank):
+                return  # counted in memory; the next write carries it
+            readable, stored = self._read(self._tank.day)
+            if not readable or (stored is not None and stored.covers(self._tank)):
                 return
             self._tank = self._tank.merge(stored)
         _warn(f"write {self._name}", RuntimeError(f"covered up {PUBLISH_TRIES} times in a row"))
 
-    def _read(self, day: str) -> Optional[Tank]:
+    def _read(self, day: str) -> tuple[bool, Optional[Tank]]:
+        """(could the store be read, the tank it holds or None)."""
         try:
             store = self._shared()
-            raw = store.get(self._key(day)) if store is not None else None
+            if store is None:
+                return False, None
+            return True, Tank.from_json(day, store.get(self._key(day)))
         except Exception as err:
             _warn(f"read {self._name}", err)
-            return None
-        return Tank.from_json(day, raw)
+            return False, None
 
     def _write(self, tank: Tank) -> bool:
         try:
@@ -198,7 +235,7 @@ class SharedBudget(Budget):
 
     def _load(self) -> Ledger:
         today = self._clock()
-        self._tank = Tank(today).merge(self._read(today))
+        self._tank = Tank(today).merge(self._read(today)[1])
         return self._tank.ledger(self._price)
 
 
@@ -221,6 +258,7 @@ class SharedAnswers:
         self._shared = store
         self._now = now
         self._pause = pause
+        self._me = mint("radio-")  # this instance's leases start with this
 
     @staticmethod
     def _key(word: str, kind: str = "answer") -> str:
@@ -244,7 +282,7 @@ class SharedAnswers:
         Write, wait a beat, read back: of two instances claiming at once, one keeps it."""
         if self._holder(word) not in (None, "mine"):
             return None
-        lease = mint()
+        lease = mint(f"{self._me}/")
         if not self._set(self._key(word, "lease"), {"owner": lease, "until": self._now() + LEASE_SECONDS},
                          {"ttl": LEASE_SECONDS, "name": "space-radio-lease"}, "lease write"):
             return lease  # no store to share a lease through: the budget still guards the spend
@@ -262,12 +300,16 @@ class SharedAnswers:
         """Rooms the lease holder bought, once they're shelved; None if it gave up or took too long."""
         for _ in range(WAIT_POLLS):
             self._pause(POLL_SECONDS)
-            shelf = self.get(word)
-            if shelf and shelf[0] < FRESH_SECONDS:
-                return shelf[1]
-            if self._holder(word) is None:
-                return None
+            gone = self._holder(word) is None  # asked first: a holder shelves its answer, then lets go
+            fresh = self.fresh(word)
+            if fresh is not None or gone:
+                return fresh
         return None
+
+    def fresh(self, word: str) -> Optional[list[Space]]:
+        """This word's rooms if someone bought them within the hour, else None."""
+        shelf = self.get(word)
+        return shelf[1] if shelf and shelf[0] < FRESH_SECONDS else None
 
     def _holder(self, word: str) -> Optional[str]:
         """Who holds this word's lease: None (nobody), "mine" (this instance) or "other"."""
@@ -276,7 +318,7 @@ class SharedAnswers:
             return None
         if raw["until"] <= self._now():
             return None
-        return "mine" if str(raw.get("owner", "")).startswith(f"{INSTANCE}.") else "other"
+        return "mine" if str(raw.get("owner", "")).startswith(f"{self._me}/") else "other"
 
     def _get(self, key: str, what: str):
         try:

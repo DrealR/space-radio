@@ -3,6 +3,7 @@ a store that refuses writes, two searches for one word, and rooms X bills that t
 No network: X is a fake that records its calls; the store is the in-memory twin of Vercel's."""
 import contextlib
 import io
+import json
 import threading
 import time
 import unittest
@@ -12,6 +13,7 @@ from spaces_radio.crew import CrewError, CrewLookup
 from spaces_radio.dock import MemoryStore
 from spaces_radio.fuel import SharedAnswers, SharedBudget
 from spaces_radio.service import RadioService
+from spaces_radio.space import Space
 from spaces_radio.sources import SHARED_FRESH_SECONDS, SourceError, XApiSource
 from tests.test_crew import SID, FakeCrewX, crew_body
 from tests.test_crew_spend import run_together
@@ -19,6 +21,11 @@ from tests.test_fuel import DAY, ID_A, ID_B, Clock
 from tests.test_radio import FakeX, TmpCase, x_item
 
 NO_PAUSE = lambda seconds: None  # noqa: E731
+
+
+def x_space(space_id):
+    return Space(id=space_id, title="Room", listeners=5, speakers=1, hosts=1, started_at="", lang="",
+                 topic="guitar", source="x-api")
 
 
 class FallsBehind:
@@ -50,6 +57,21 @@ class RefusesWrites:
 
     def set(self, key, value, options=None):
         raise RuntimeError("the cache refused the write")
+
+
+class ReadsFail:
+    """Writes work; reads fail once `down` is set."""
+
+    def __init__(self, store):
+        self.store, self.down = store, False
+
+    def get(self, key):
+        if self.down:
+            raise RuntimeError("the cache timed out")
+        return self.store.get(key)
+
+    def set(self, key, value, options=None):
+        self.store.set(key, value, options)
 
 
 class MeetFirst:
@@ -101,16 +123,55 @@ class TankRaceTests(unittest.TestCase):
             self.assertIsNone(flaky.try_reserve(119), "an older stored tank must not reopen spending")
             self.assertFalse(flaky.can_afford(1))
 
-    def test_two_instances_reserving_the_last_fuel_at_once_never_pass_the_cap(self):
+    def race(self, rooms):
         store = MemoryStore()
         meet = MeetFirst(store, 2)
         tanks = [tank(meet, pause=time.sleep), tank(meet, pause=time.sleep)]
-        results = run_together(2, lambda k: tanks[k].try_reserve(80))
+        results = run_together(2, lambda k: ("done", tanks[k].try_reserve(rooms)))
         self.assertEqual(meet.met, 2, "both instances read the same tank before either wrote")
-        self.assertFalse([r for r in results if isinstance(r, Exception)])
-        granted = [held for held in results if held]
+        self.assertEqual([r[0] for r in results], ["done", "done"])
+        return store, [held for _, held in results if held]
+
+    def test_two_instances_reserving_the_last_fuel_at_once_never_pass_the_cap(self):
+        store, granted = self.race(80)
         self.assertLessEqual(len(granted), 1, "80 + 80 rooms can't both fit under 120")
         self.assertLessEqual(tank(store).ledger().spent, 0.60 + 1e-9)
+
+    def test_two_instances_that_both_fit_both_get_their_fuel(self):
+        store, granted = self.race(40)
+        self.assertEqual(len(granted), 2)
+        self.assertAlmostEqual(tank(store).ledger().spent, 80 * PRICE_PER_SPACE)
+
+    def test_a_charge_covered_up_during_its_second_look_is_put_back(self):
+        store = MemoryStore()
+        view = FallsBehind(store)
+        two = tank(view)
+        view.fall_behind()                       # two read the empty tank before one wrote
+        one = tank(store, pause=lambda seconds: two.charge([ID_B]))  # ...and writes during one's beat
+        one.charge([ID_A])
+        self.assertAlmostEqual(tank(store).ledger().spent, 2 * PRICE_PER_SPACE,
+                               msg="one never has to come back for its record to survive")
+
+    def test_a_failed_read_never_overwrites_the_tank(self):
+        store = MemoryStore()
+        tank(store).charge([f"r{i}" for i in range(20)])       # another instance: $0.10
+        blind = ReadsFail(store)
+        three = tank(blind)
+        blind.down = True
+        with contextlib.redirect_stderr(io.StringIO()):
+            three.ledger()
+            three.can_afford(1)
+            self.assertIsNone(three.try_reserve(1), "no fuel while the tank can't be read")
+        self.assertAlmostEqual(tank(store).ledger().spent, 20 * PRICE_PER_SPACE)
+
+    def test_calls_that_cost_nothing_keep_the_tank_small(self):
+        store = MemoryStore()
+        budget = tank(store)
+        for _ in range(500):
+            budget.settle(budget.try_reserve(10), [])   # a search that found no rooms: $0
+        stored = store.get(f"fuel-bands-{DAY()}")
+        self.assertEqual((budget.ledger().spent, budget.ledger().calls), (0, 500))
+        self.assertLess(len(json.dumps(stored)), 400)
 
     def test_a_tank_from_the_previous_version_still_counts(self):
         store = MemoryStore()
@@ -152,6 +213,31 @@ class OneWordOnceTests(unittest.TestCase):
         self.assertEqual(len(calls), 1, "the second instance waits for the first one's answer")
         self.assertEqual([[r.id for r in rooms] for rooms in results], [[ID_A]] * 2)
         self.assertAlmostEqual(tank(store).ledger().spent, PRICE_PER_SPACE)
+
+    def test_a_radio_arriving_while_another_buys_waits_for_its_answer(self):
+        store, clock = MemoryStore(), Clock()
+        fake, calls = self.slow_x(delay=0.3)
+
+        def instance():
+            answers = SharedAnswers(lambda: store, now=clock, pause=time.sleep)
+            return XApiSource("tok", tank(store, cap=1.0), fetch=fake, now=clock, answers=answers)
+        first, second = instance(), instance()
+        early = threading.Thread(target=first.live, args=("guitar",))
+        early.start()
+        time.sleep(0.2)                               # first holds the lease and is asking X
+        self.assertEqual([r.id for r in second.live("guitar")], [ID_A])
+        early.join(5)
+        self.assertEqual(len(calls), 1)
+
+    def test_an_answer_shelved_while_claiming_is_used_not_bought_again(self):
+        store, clock = MemoryStore(), Clock()
+        other = SharedAnswers(lambda: store, now=clock, pause=NO_PAUSE)
+        shelved = lambda seconds: other.put("guitar", [x_space(ID_B)])  # noqa: E731
+        answers = SharedAnswers(lambda: store, now=clock, pause=shelved)
+        fake = FakeX([x_item(ID_A)])
+        src = XApiSource("tok", tank(store, cap=1.0), fetch=fake, now=clock, answers=answers)
+        self.assertEqual([r.id for r in src.live("guitar")], [ID_B])
+        self.assertEqual(fake.urls, [])
 
     def another_instance_holds(self, store, clock, word):
         lease_key = SharedAnswers._key(word, "lease")

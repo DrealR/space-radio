@@ -42,7 +42,7 @@ def minutes_ago(seconds: float) -> str:
 
 
 SHARED_FRESH_SECONDS = 3600  # a word's shared answer is bought at most once an hour
-FOLLOW_SECONDS = 25.0        # a request waits this long on this instance's search of the same word
+FOLLOW_SECONDS = 12.0        # a request waits this long on this instance's search of the same word
 
 
 class SpaceSource(Protocol):
@@ -142,6 +142,10 @@ class XApiSource:
             if lease is None:
                 raise self._still_searching(shelf)
         try:
+            rooms = self._answers.fresh(topic)  # bought and shelved while we were claiming the lease?
+            if rooms is not None:
+                self._remember(topic, self._now(), rooms)
+                return rooms
             return self._buy(topic, shelf)
         finally:
             self._answers.release(topic, lease)
