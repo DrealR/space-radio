@@ -1,7 +1,10 @@
 """Docking: two radios, one tunnel. No network: the relay is an in-memory store with a fake clock."""
+import io
 import json
+import threading
 import unittest
 
+from api import dock as dock_api
 from spaces_radio.dock import CLAIM_SECONDS, IDLE_SECONDS, DockError, MemoryStore, beat, clean_state, parse_beat
 from spaces_radio.service import dock_post
 
@@ -75,6 +78,45 @@ class BeatTests(unittest.TestCase):
         self.send("b", SHIP_B, {"left": True})
         self.assertEqual(self.send("b", SHIP_C)["role"], "b")
 
+    def test_concurrent_claims_for_one_role_only_admit_one_ship(self):
+        claim_key = f"dock-{TOKEN.replace('.', '-')}-a"
+
+        class ReadBarrierStore(MemoryStore):
+            def __init__(self, now):
+                super().__init__(now=now)
+                self.reads = threading.Barrier(2)
+
+            def get(self, key):
+                value = super().get(key)
+                if key == claim_key:
+                    try:
+                        self.reads.wait(timeout=0.15)
+                    except threading.BrokenBarrierError:
+                        pass
+                return value
+
+        self.store = ReadBarrierStore(self.clock)
+        start = threading.Barrier(3)
+        results = []
+
+        def claim(ship):
+            start.wait(timeout=1)
+            try:
+                results.append(("ok", self.send("a", ship)))
+            except DockError as err:
+                results.append(("error", err.status))
+
+        workers = [threading.Thread(target=claim, args=(ship,)) for ship in (SHIP_A, SHIP_C)]
+        for worker in workers:
+            worker.start()
+        start.wait(timeout=1)
+        for worker in workers:
+            worker.join(timeout=2)
+
+        self.assertFalse(any(worker.is_alive() for worker in workers))
+        self.assertCountEqual([result[0] for result in results], ["ok", "error"])
+        self.assertEqual([result[1] for result in results if result[0] == "error"], [409])
+
     def test_the_same_ship_can_beat_again_and_slots_expire(self):
         self.send("a", SHIP_A)
         self.send("a", SHIP_A)
@@ -92,6 +134,14 @@ class ServiceTests(unittest.TestCase):
         dock_post(body("b", SHIP_B), store=store, now=5.0)
         self.assertEqual(dock_post(body("b", SHIP_C), store=store, now=6.0).status, 409)
 
+    def test_malformed_field_types_are_bad_requests(self):
+        malformed = (body([], SHIP_A), body("a", SHIP_A, {"tone": {"kind": []}}))
+        for raw in malformed:
+            with self.subTest(raw=raw):
+                reply = dock_post(raw, store=MemoryStore())
+                self.assertEqual(reply.status, 400)
+                self.assertFalse(reply.body["success"])
+
     def test_relay_errors_become_503(self):
         class Broken:
             def get(self, key):
@@ -103,6 +153,31 @@ class ServiceTests(unittest.TestCase):
         reply = dock_post(body("a", SHIP_A), store=Broken())
         self.assertEqual(reply.status, 503)
         self.assertFalse(reply.body["success"])
+
+
+class ApiTests(unittest.TestCase):
+    def test_nonnumeric_content_length_returns_a_json_error(self):
+        class Request:
+            headers = {"Content-Length": "abc"}
+            rfile = io.BytesIO(b"")
+
+            def __init__(self):
+                self.wfile = io.BytesIO()
+                self.status = None
+
+            def send_response(self, status):
+                self.status = status
+
+            def send_header(self, name, value):
+                pass
+
+            def end_headers(self):
+                pass
+
+        request = Request()
+        dock_api.handler.do_POST(request)
+        self.assertEqual(request.status, 400)
+        self.assertFalse(json.loads(request.wfile.getvalue())["success"])
 
 
 if __name__ == "__main__":

@@ -157,6 +157,13 @@ class CrewParseTests(unittest.TestCase):
         scheduled = parse_crew(crew_body(state="scheduled"), SID, "full")
         self.assertEqual((scheduled.state, scheduled.crew), ("scheduled", ()))
 
+    def test_errors_only_for_an_unrelated_upstream_failure_are_not_ended(self):
+        unavailable = {"errors": [{"title": "Service Unavailable",
+                                    "type": "https://api.twitter.com/2/problems/service-unavailable"}]}
+        with self.assertRaises(CrewError) as caught:
+            parse_crew(unavailable, SID, "full")
+        self.assertEqual(caught.exception.reason, "upstream")
+
     def test_wrong_or_broken_answers_are_upstream_errors(self):
         for body in (crew_body(space_id="1OwxWzqXyLbJQ"), [], "x", {}, {"data": None},
                      crew_body(state="weird"), crew_body(state=["live"])):
@@ -261,6 +268,12 @@ class CrewLookupTests(TmpCase):
         self.assertEqual(len(fake.urls), 4)
         self.assertAlmostEqual(self.users.ledger().spent, 6 * PRICE_PER_USER)
         self.assertAlmostEqual(self.spaces.ledger().spent, 4 * PRICE_PER_SPACE)
+
+    def test_full_scan_counts_the_space_from_each_lookup(self):
+        crew = self.make(FakeCrewX(crew_body()))
+        crew.scan(SID)
+        ledger = self.spaces.ledger()
+        self.assertEqual((ledger.calls, ledger.items), (2, 2))
 
     def test_users_x_returns_are_charged_even_when_dropped(self):
         crew = self.make(FakeCrewX(crew_body(users=USERS + [user("99", "bad handle!"), {"name": "no id"}])))

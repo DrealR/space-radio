@@ -12,7 +12,11 @@ MAX_BODY = 4096
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            write_reply(self, Reply(400, envelope(error="Content-Length must be an integer.")))
+            return
         body = self.rfile.read(length) if 0 < length <= MAX_BODY else b""
         write_reply(self, dock_post(body))
 

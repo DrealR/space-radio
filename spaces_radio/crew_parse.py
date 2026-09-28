@@ -38,6 +38,8 @@ _STATES = {"live": "live", "scheduled": "scheduled", "ended": "ended", "canceled
 _ISO = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:\.[0-9]{1,6})?)?"
                   r"(?:Z|[+-][0-9]{2}:?[0-9]{2})?")
 _LANG = re.compile(r"[A-Za-z0-9-]{1,16}")
+_NOT_FOUND = "https://api.twitter.com/2/problems/resource-not-found"
+_HTTP_NOT_FOUND = "Not Found (HTTP 404)"
 
 
 class CrewError(Exception):
@@ -101,7 +103,12 @@ def parse_crew(body, space_id: str, mode: str) -> CrewScan:
     if not isinstance(body, dict):
         raise CrewError("upstream", "answer is not an object")
     data = body.get("data")
-    if data is None and isinstance(body.get("errors"), list) and body["errors"]:
+    errors = body.get("errors")
+    not_found = isinstance(errors, list) and bool(errors) and all(
+        isinstance(error, dict) and (error.get("type") == _NOT_FOUND or error.get("title") == _HTTP_NOT_FOUND)
+        for error in errors
+    )
+    if data is None and not_found:
         return CrewScan(id=space_id, state="ended", mode=mode)  # X says: no such Space (any more)
     if not isinstance(data, dict) or data.get("id") != space_id:
         raise CrewError("upstream", "no Space data for this id")

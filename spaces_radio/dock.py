@@ -26,6 +26,7 @@ MAX_BODY = 2048
 IDLE_SECONDS = 30 * 60     # a slot nobody beats for 30 minutes is gone
 CLAIM_SECONDS = 45         # a ship that stopped beating this long ago gives up its slot
 _UNSAFE = re.compile(r"[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]")
+_CLAIM_LOCK = threading.Lock()
 
 
 class DockStore(Protocol):
@@ -86,8 +87,9 @@ def clean_state(raw) -> dict:
     tone = raw.get("tone") if isinstance(raw.get("tone"), dict) else {}
     seq = tone.get("seq")
     clean_tone = None
-    if tone.get("kind") in TONES and isinstance(seq, int) and 0 < seq < 10**9:
-        clean_tone = {"kind": tone["kind"], "seq": seq, "room": _room(tone.get("room"))}
+    kind = tone.get("kind")
+    if isinstance(kind, str) and kind in TONES and isinstance(seq, int) and 0 < seq < 10**9:
+        clean_tone = {"kind": kind, "seq": seq, "room": _room(tone.get("room"))}
     return {"room": _room(raw.get("room")), "band": _clean_text(raw.get("band"), 24),
             "air": raw.get("air") is True, "tone": clean_tone, "left": raw.get("left") is True}
 
@@ -104,9 +106,13 @@ def parse_beat(body: bytes) -> Beat:
     token, role, ship = raw.get("token"), raw.get("role"), raw.get("ship")
     if not isinstance(token, str) or not TOKEN.fullmatch(token):
         raise DockError(400, "That isn't a dock code.")
-    if role not in ROLES or not isinstance(ship, str) or not SHIP.fullmatch(ship):
+    if not isinstance(role, str) or role not in ROLES or not isinstance(ship, str) or not SHIP.fullmatch(ship):
         raise DockError(400, "Unknown ship.")
-    return Beat(token, role, ship, clean_state(raw.get("state")))
+    state = raw.get("state")
+    tone = state.get("tone") if isinstance(state, dict) else None
+    if isinstance(tone, dict) and "kind" in tone and not isinstance(tone["kind"], str):
+        raise DockError(400, "Unknown tone.")
+    return Beat(token, role, ship, clean_state(state))
 
 
 def _slot(token: str, role: str) -> str:
@@ -115,13 +121,14 @@ def _slot(token: str, role: str) -> str:
 
 def beat(store: DockStore, b: Beat, now: float) -> dict:
     """Write this ship's slot, read the partner's. Raises DockError(409) if the slot is someone else's."""
-    held = store.get(_slot(b.token, b.role))
-    if isinstance(held, dict) and held.get("ship") != b.ship:
-        still_there = now - float(held.get("at", 0)) < CLAIM_SECONDS
-        if still_there and not (held.get("state") or {}).get("left"):
-            raise DockError(409, "This dock already has two ships.")
-    store.set(_slot(b.token, b.role), {"ship": b.ship, "at": now, "state": b.state},
-              {"ttl": IDLE_SECONDS, "name": "space-radio-dock"})
+    with _CLAIM_LOCK:
+        held = store.get(_slot(b.token, b.role))
+        if isinstance(held, dict) and held.get("ship") != b.ship:
+            still_there = now - float(held.get("at", 0)) < CLAIM_SECONDS
+            if still_there and not (held.get("state") or {}).get("left"):
+                raise DockError(409, "This dock already has two ships.")
+        store.set(_slot(b.token, b.role), {"ship": b.ship, "at": now, "state": b.state},
+                  {"ttl": IDLE_SECONDS, "name": "space-radio-dock"})
     peer = store.get(_slot(b.token, ROLES[b.role]))
     if not isinstance(peer, dict):
         return {"role": b.role, "peer": None}
