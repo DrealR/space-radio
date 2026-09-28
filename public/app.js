@@ -372,6 +372,7 @@ async function start() {
 
 // Asks the tower for its bands. On failure the presets still play, and it asks again later.
 async function tuneIn(prefs) {
+  const startedOn = state.band; // the band the radio is on while the tower thinks
   const status = await api("/api/status");
   if (status.error) {
     set({ loading: false, problems: [status.error] });
@@ -382,8 +383,28 @@ async function tuneIn(prefs) {
   set({ bands, liveSearch: status.data.live_search, problems: [] });
   const known = (b) => bands.includes(b) || Boolean(findBand(state.myBands, b));
   const beam = readBeam(location.search, (b) => bands.includes(b));
-  await tuneBand(beam?.band || (known(prefs.band) ? prefs.band : bands[0]));
-  if (beam) landBeam(app, beam);
+  // A start that lands late, or in a tab nobody is looking at, spends nothing: a band the
+  // listener chose while the tower thought is their own, already bought, and a hidden tab
+  // tunes the moment it is looked at rather than buying a search no one is watching.
+  if (state.band === startedOn) {
+    const tune = async () => {
+      if (state.band !== startedOn) return; // they chose for themselves while the radio waited
+      await tuneBand(beam?.band || (known(prefs.band) ? prefs.band : bands[0]));
+      if (beam) landBeam(app, beam);
+    };
+    if (document.hidden) whenLookedAt(tune);
+    else await tune();
+  }
+  startRadio();
+}
+
+let started = false;   // the session's one-time setup has run
+let waiting = null;    // the listener a hidden start is waiting on, if any
+
+// Dock, crew, refresh: set up once, however many times the tower was asked.
+function startRadio() {
+  if (started) return;
+  started = true;
   // A docking link opens the tunnel; otherwise a reload picks up this tab's dock, if any.
   const dockToken = readDock(location.search);
   if (dockToken) {
@@ -395,6 +416,19 @@ async function tuneIn(prefs) {
   preloadCrew();
   // Refresh only while someone can see the radio: a hidden tab never spends.
   setInterval(() => state.liveSearch && !document.hidden && tuneBand(state.band, { refresh: true }), REFRESH_MS);
+}
+
+/** A start that found nobody looking tunes the first time the tab is looked at, and never again. */
+function whenLookedAt(go) {
+  if (waiting) return;
+  const seen = () => {
+    if (document.hidden) return;
+    document.removeEventListener("visibilitychange", seen);
+    waiting = null;
+    go();
+  };
+  waiting = seen;
+  document.addEventListener("visibilitychange", seen);
 }
 
 start();
