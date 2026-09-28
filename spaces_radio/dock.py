@@ -25,8 +25,8 @@ ROLES = {"a": "b", "b": "a"}
 MAX_BODY = 2048
 IDLE_SECONDS = 30 * 60     # a slot nobody beats for 30 minutes is gone
 CLAIM_SECONDS = 45         # a ship that stopped beating this long ago gives up its slot
+RECHECK_SECONDS = 0.1      # a new claim waits this beat, then reads its slot back
 _UNSAFE = re.compile(r"[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]")
-_CLAIM_LOCK = threading.Lock()
 
 
 class DockStore(Protocol):
@@ -119,16 +119,26 @@ def _slot(token: str, role: str) -> str:
     return f"dock-{token.replace('.', '-')}-{role}"   # url-safe: the key rides in the cache URL
 
 
-def beat(store: DockStore, b: Beat, now: float) -> dict:
-    """Write this ship's slot, read the partner's. Raises DockError(409) if the slot is someone else's."""
-    with _CLAIM_LOCK:
-        held = store.get(_slot(b.token, b.role))
-        if isinstance(held, dict) and held.get("ship") != b.ship:
-            still_there = now - float(held.get("at", 0)) < CLAIM_SECONDS
-            if still_there and not (held.get("state") or {}).get("left"):
-                raise DockError(409, "This dock already has two ships.")
-        store.set(_slot(b.token, b.role), {"ship": b.ship, "at": now, "state": b.state},
-                  {"ttl": IDLE_SECONDS, "name": "space-radio-dock"})
+def beat(store: DockStore, b: Beat, now: float, pause: Callable[[float], None] = time.sleep) -> dict:
+    """Write this ship's slot, read the partner's. Raises DockError(409) if the slot is someone else's.
+
+    Taking a slot (empty, gone quiet, or left) waits a beat and reads it back, so of two ships claiming
+    at once on different instances, the one whose write was covered hears the dock is full. Best effort
+    by design (Sep 28): nothing here is paid, a read-back that shows nothing lets the beat through, and
+    a claim that still slips past is caught on its next beat."""
+    slot = _slot(b.token, b.role)
+    held = store.get(slot)
+    ours = isinstance(held, dict) and held.get("ship") == b.ship
+    if isinstance(held, dict) and not ours:
+        still_there = now - float(held.get("at", 0)) < CLAIM_SECONDS
+        if still_there and not (held.get("state") or {}).get("left"):
+            raise DockError(409, "This dock already has two ships.")
+    store.set(slot, {"ship": b.ship, "at": now, "state": b.state}, {"ttl": IDLE_SECONDS, "name": "space-radio-dock"})
+    if not ours:
+        pause(RECHECK_SECONDS)
+        now_held = store.get(slot)
+        if isinstance(now_held, dict) and now_held.get("ship") != b.ship:
+            raise DockError(409, "This dock already has two ships.")
     peer = store.get(_slot(b.token, ROLES[b.role]))
     if not isinstance(peer, dict):
         return {"role": b.role, "peer": None}

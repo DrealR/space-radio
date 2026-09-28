@@ -140,7 +140,7 @@ class XApiSource:
                 return rooms
             lease = self._answers.claim(topic)  # it gave up (X said no, or no fuel): try once ourselves
             if lease is None:
-                raise self._still_searching(shelf)
+                raise self._still_searching(shelf) if self._answers.held_elsewhere(topic) else self._unconfirmed(shelf)
         try:
             rooms = self._answers.fresh(topic)  # bought and shelved while we were claiming the lease?
             if rooms is not None:
@@ -156,6 +156,13 @@ class XApiSource:
             return StaleRooms(f"Another radio is searching this word: showing rooms from {minutes_ago(shelf[0])}.",
                               *shelf[::-1])
         return SourceError("Another radio is searching this word right now; try again in a moment.")
+
+    @staticmethod
+    def _unconfirmed(shelf) -> SourceError:
+        if shelf:
+            return StaleRooms(f"The relay couldn't reserve this search: showing rooms from {minutes_ago(shelf[0])}.",
+                              *shelf[::-1])
+        return SourceError("The relay couldn't reserve this search; try again in a moment.")
 
     def _buy(self, topic: str, shelf) -> list[Space]:
         # Hold the worst case before asking, so requests arriving together can't all pass the cap.

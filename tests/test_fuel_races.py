@@ -4,6 +4,7 @@ No network: X is a fake that records its calls; the store is the in-memory twin 
 import contextlib
 import io
 import json
+import multiprocessing
 import threading
 import time
 import unittest
@@ -100,6 +101,30 @@ class MeetFirst:
 
 def tank(store, cap=0.60, pause=NO_PAUSE):
     return SharedBudget("bands", lambda: store, daily_cap=cap, clock=DAY, pause=pause)
+
+
+class _SharedDict:
+    """A store two processes share (a Manager dict), with get/set only, like the Runtime Cache.
+    Each process's first read waits for the other's, so both see the word unclaimed."""
+
+    def __init__(self, items, first_read):
+        self.items, self.first_read, self.waited = items, first_read, False
+
+    def get(self, key):
+        value = self.items.get(key)
+        if not self.waited:
+            self.waited = True
+            self.first_read.wait(5)
+        return value
+
+    def set(self, key, value, options=None):
+        self.items[key] = value
+
+
+def _claim_in_process(items, first_read, written, results):
+    store = _SharedDict(items, first_read)
+    answers = SharedAnswers(lambda: store, pause=lambda seconds: written.wait(5))
+    results.append(answers.claim("guitar"))
 
 
 class TankRaceTests(unittest.TestCase):
@@ -278,6 +303,45 @@ class OneWordOnceTests(unittest.TestCase):
         src = XApiSource("tok", tank(store, cap=1.0), fetch=fake, now=clock, answers=answers)
         self.assertEqual([r.id for r in src.live("guitar")], [ID_A])
         self.assertEqual(len(fake.urls), 1)
+
+
+class StrictLeaseTests(unittest.TestCase):
+    """Sep 28, Mo's pick on Reemy's word: a paid search needs a lease this instance saw come back as
+    its own. A lease the relay won't take, or can't show back, buys nothing (fail closed)."""
+
+    def radio(self, answers_store, tank_store, fake, clock, pause=NO_PAUSE):
+        answers = SharedAnswers(lambda: answers_store, now=clock, pause=pause)
+        return XApiSource("tok", tank(tank_store, cap=1.0), fetch=fake, now=clock, answers=answers)
+
+    def test_a_lease_the_relay_refuses_buys_nothing(self):
+        store, clock, fake = MemoryStore(), Clock(), FakeX([x_item(ID_A)])
+        src = self.radio(RefusesWrites(store), store, fake, clock)
+        with self.assertRaises(SourceError) as caught:
+            src.live("guitar")
+        self.assertIn("couldn't reserve", str(caught.exception))
+        self.assertEqual((fake.urls, tank(store).ledger().spent), ([], 0))
+
+    def test_a_lease_that_cannot_be_read_back_buys_nothing(self):
+        flaky = ReadsFail(MemoryStore())
+        answers = SharedAnswers(lambda: flaky, now=Clock(), pause=lambda seconds: setattr(flaky, "down", True))
+        self.assertIsNone(answers.claim("guitar"))
+
+    def test_with_the_relay_down_no_lease_is_handed_out(self):
+        self.assertIsNone(SharedAnswers(lambda: None, now=Clock(), pause=NO_PAUSE).claim("guitar"))
+
+    def test_two_processes_claiming_one_word_at_once_hand_out_one_lease(self):
+        with multiprocessing.Manager() as manager:
+            items, results = manager.dict(), manager.list()
+            first_read, written = manager.Barrier(2), manager.Barrier(2)
+            procs = [multiprocessing.Process(target=_claim_in_process, args=(items, first_read, written, results))
+                     for _ in range(2)]
+            for p in procs:
+                p.start()
+            for p in procs:
+                p.join(20)
+            self.assertEqual([p.exitcode for p in procs], [0, 0])
+            leases = list(results)
+        self.assertEqual(sorted(lease is not None for lease in leases), [False, True])
 
 
 class BilledRoomTests(TmpCase):

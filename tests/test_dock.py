@@ -2,6 +2,7 @@
 import io
 import json
 import threading
+import time
 import unittest
 
 from api import dock as dock_api
@@ -53,9 +54,41 @@ class BeatTests(unittest.TestCase):
     def setUp(self):
         self.clock = Clock()
         self.store = MemoryStore(now=self.clock)
+        self.pauses = []
+        self.pause = self.pauses.append
 
     def send(self, role, ship, state=None):
-        return beat(self.store, parse_beat(body(role, ship, state)), self.clock())
+        return beat(self.store, parse_beat(body(role, ship, state)), self.clock(), pause=self.pause)
+
+    def slot(self, role):
+        return f"dock-{TOKEN.replace('.', '-')}-{role}"
+
+    def test_a_claim_covered_by_another_instance_hears_the_dock_is_full(self):
+        def other_instance_lands(seconds):  # ship C's write, from another instance, lands during our beat
+            self.store.set(self.slot("a"), {"ship": SHIP_C, "at": self.clock(), "state": {}}, {"ttl": IDLE_SECONDS})
+        self.pause = other_instance_lands
+        with self.assertRaises(DockError) as full:
+            self.send("a", SHIP_A)
+        self.assertEqual(full.exception.status, 409)
+        self.assertEqual(self.store.get(self.slot("a"))["ship"], SHIP_C, "the ship that kept the slot keeps it")
+
+    def test_only_a_new_claim_waits_to_look_again(self):
+        self.send("a", SHIP_A)
+        self.send("a", SHIP_A)
+        self.send("a", SHIP_A)
+        self.assertEqual(len(self.pauses), 1, "the owner's own beats never wait")
+
+    def test_a_read_back_that_shows_nothing_still_docks(self):
+        class Forgets(MemoryStore):  # best effort: nothing here is paid, so a blank look lets the beat through
+            def __init__(self, now, slot):
+                super().__init__(now=now)
+                self.slot, self.blind = slot, False
+
+            def get(self, key):
+                return None if self.blind and key == self.slot else super().get(key)
+        self.store = Forgets(self.clock, self.slot("a"))
+        self.pause = lambda seconds: setattr(self.store, "blind", True)
+        self.assertEqual(self.send("a", SHIP_A)["role"], "a")
 
     def test_two_ships_see_each_other(self):
         self.assertEqual(self.send("a", SHIP_A, {"room": ROOM}), {"role": "a", "peer": None})
@@ -96,6 +129,7 @@ class BeatTests(unittest.TestCase):
                 return value
 
         self.store = ReadBarrierStore(self.clock)
+        self.pause = time.sleep  # real time: two separate claimers, no lock between them
         start = threading.Barrier(3)
         results = []
 

@@ -24,7 +24,8 @@ found by the Sky Survey, tightened after review):
   the last fuel at once, at most one keeps it (both may back off: that fails closed). A charge
   is looked at again after the same beat, so a write that covered it up gets undone.
 - A word being bought carries a short lease: a second instance waits for that answer instead
-  of paying for the same search.
+  of paying for the same search. The lease is strict (Sep 28): it counts only once this instance
+  has read it back as its own, and a lease the relay won't take or can't show back buys nothing.
 
 What's left: an instance that stalls longer than the beat between reading and writing can
 still slip one hold past a racer. X's prepaid credits stay the hard stop.
@@ -278,17 +279,24 @@ class SharedAnswers:
 
     # ---- the lease: one instance buys a word at a time ---------------------------------------------
     def claim(self, word: str) -> Optional[str]:
-        """Take this word's search. Returns the lease, or None while another instance holds it.
-        Write, wait a beat, read back: of two instances claiming at once, one keeps it."""
+        """Take this word's search. Returns the lease, or None when another instance holds it or the
+        relay can't confirm ours. Write, wait a beat, read back: of two instances claiming at once,
+        the last write keeps it. Fails closed, because the tank caps the day's spend but only the
+        lease stops a second paid search for the same word. Get/set can't make this atomic: an
+        instance stalled longer than the beat between its look and its write can still slip past."""
         if self._holder(word) not in (None, "mine"):
             return None
         lease = mint(f"{self._me}/")
         if not self._set(self._key(word, "lease"), {"owner": lease, "until": self._now() + LEASE_SECONDS},
                          {"ttl": LEASE_SECONDS, "name": "space-radio-lease"}, "lease write"):
-            return lease  # no store to share a lease through: the budget still guards the spend
+            return None
         self._pause(RECHECK_SECONDS)
         raw = self._get(self._key(word, "lease"), "lease read")
-        return lease if not isinstance(raw, dict) or raw.get("owner") == lease else None
+        return lease if isinstance(raw, dict) and raw.get("owner") == lease else None
+
+    def held_elsewhere(self, word: str) -> bool:
+        """Another instance holds this word's lease right now."""
+        return self._holder(word) == "other"
 
     def release(self, word: str, lease: str) -> None:
         raw = self._get(self._key(word, "lease"), "lease read")
