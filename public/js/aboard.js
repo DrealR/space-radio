@@ -82,7 +82,11 @@ export function crewOptions(app, launch, room, crewApi = crewModule) {
       disabled: copy.ptt.mode === "off",
       onClick: (e) => {
         // The manifest names one room and its PUSH boards that room, needle or no needle: if the
-        // needle wandered while the sheet was open, it goes back under the manifest first.
+        // needle wandered while the sheet was open, it goes back under the manifest first. A room
+        // the dial no longer holds is a different story — selecting it would line up a room that
+        // is not there and PUSH would open the needle's room instead, so the link alone carries
+        // this one: it already names the room the manifest is talking about.
+        if (!app.deck().some((r) => r.id === room.id)) return;
         if (app.current()?.id !== room.id) app.select(room.id, { quiet: true });
         launch.push(e);
       },

@@ -48,7 +48,7 @@ function makeRadio({ hidden, answer }) {
     preloadCrew: () => {},
     location: { search: "", pathname: "/" },
     history: { replaceState() {} },
-    document: { hidden },
+    document: { hidden, addEventListener() {}, removeEventListener() {} },
     RETRY_STATUS_MS: 60000,
     REFRESH_MS: 1800000,
   };
@@ -95,7 +95,7 @@ test("PUSH in the crew manifest never boards a room the manifest does not name",
   let state = { air: { phase: "idle", roomId: null }, currentId: A.id, rosters: {}, ended: [], learned: { crew: true } };
   let calls = [];
   const note = (name) => (...args) => { calls = [...calls, [name, ...args]]; };
-  let deck = [A, B];
+  const deck = [A, B];
   const app = {
     get state() { return state; },
     device: { kind: "desktop" },
@@ -107,10 +107,9 @@ test("PUSH in the crew manifest never boards a room the manifest does not name",
   };
   const launch = { push: note("push"), leaveForX: note("leaveForX") };
 
-  // The manifest is open on A. A refresh drops A off the band and the needle lands on B.
+  // The manifest is open on A. SCAN moved the needle to B, and A is still on the dial.
   const opts = crewOptions(app, launch, A);
   state = { ...state, currentId: B.id };
-  deck = [B];
   const click = { preventDefault() {} };
   opts.listen.onClick(click);
 
@@ -145,8 +144,8 @@ test("the arrow keys move the ORDER choice instead of tuning the radio", () => {
     heard: () => {}, crew: () => {}, radar: () => {}, openX: () => {}, manual: () => {}, escape: () => {},
   });
   assert.equal(typeof keydown, "function", "the page wires one keydown listener");
-  // A <button> in the ORDER radiogroup: not a text field, but not the radio either.
-  const order = { closest: () => null };
+  // A <button> in the ORDER radiogroup: not a text field, but a group the page is building.
+  const order = { closest: (sel) => (sel.includes("radiogroup") ? { id: "order" } : null) };
   keydown({ key: "ArrowRight", target: order, defaultPrevented: false, metaKey: false, ctrlKey: false, altKey: false, preventDefault() {} });
   assert.deepEqual(calls, [], "the ORDER control owns its arrow keys");
 });
