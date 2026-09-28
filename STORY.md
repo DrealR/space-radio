@@ -53,7 +53,7 @@ is the radio on its dashboard.
 ```
 browser (the radio) ──▶ /api/tune?station=music ──▶ X API: search live Spaces
                           │  one server key, never sent to the browser
-                          └─ answer cached 10 min on Vercel's CDN, shared by every listener
+                          └─ answer cached 30 min on Vercel's CDN, shared by every listener
 ```
 
 - One key serves every listener. Listeners never need a developer account.
