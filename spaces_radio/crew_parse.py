@@ -11,10 +11,10 @@ from typing import Optional
 from urllib.parse import urlencode
 
 from .people import normalize_person, user_id, clean_text
-from .space import non_negative_int
+from .space import ROOM_ID, non_negative_int
 
 LOOKUP_URL = "https://api.x.com/2/spaces/{id}"
-CREW_ID = re.compile(r"^[A-Za-z0-9]{8,13}$")
+CREW_ID = ROOM_ID  # the same room ids the dial shows: a 16-character id is still a room
 MAX_CREW = 30
 MAX_BILLABLE = 1000         # never walk an unbounded id list, even to count what X would bill
 

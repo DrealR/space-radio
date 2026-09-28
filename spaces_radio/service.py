@@ -30,6 +30,7 @@ from .budget import (DEFAULT_CREW_DAILY_CAP, DEFAULT_CREW_SPACE_CAP, DEFAULT_DAI
 from .crew import LIVE_SECONDS, MESSAGES, SETTLED_SECONDS, CrewError, CrewLookup, valid_crew_id
 from .fixtures import make_fake_fetch
 from .sources import SourceError, SpaceSource, StaleRooms, XApiSource, _http_get_json
+from .space import ROOM_ID_BODY
 from .stations import STATIONS, tune
 from .ticket import Tickets, ticket_key
 from .words import word_from_raw
@@ -44,7 +45,7 @@ CREW_PARAMS = {"id", "t"}  # t: the ticket /api/tune gave the room (optional)
 FAKE_CREW_DELAY = 0.8   # seconds; long enough to see SCANNING CREW locally
 # Exactly what the page sends (encodeURIComponent), and nothing else: one CDN key per request.
 TUNE_QUERIES = frozenset("station=" + quote(name, safe="") for name in STATIONS)  # late night -> late%20night
-CREW_QUERY = re.compile(r"id=[A-Za-z0-9]{8,13}(?:&t=[0-9a-f]{16})?")
+CREW_QUERY = re.compile(r"id=" + ROOM_ID_BODY + r"(?:&t=[0-9a-f]{16})?")
 # /api/crew failures: reason -> (HTTP status, CDN seconds). Vercel's CDN doesn't cache 5xx answers,
 # so these seconds reach browsers only; CrewLookup's hold is what keeps a busy X from being asked
 # again at once. The same goes for TROUBLE_SECONDS on /api/tune errors.

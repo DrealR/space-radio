@@ -172,6 +172,8 @@ test("links: profiles and Spaces only for valid names and ids", () => {
   assert.equal(profileUrl("ada_99"), "https://x.com/ada_99");
   assert.equal(profileUrl("../home"), null);
   assert.equal(spaceLink(ID), `https://x.com/i/spaces/${ID}`);
+  assert.equal(spaceLink("1YqKDqWqdPLxVabc"), "https://x.com/i/spaces/1YqKDqWqdPLxVabc");  // 16: the dial's long one
+  assert.equal(spaceLink("1YqKDqWqdPLxVabcdefgh"), null);  // 21: no room is that long
   assert.equal(spaceLink("https://x.com/i/spaces/1YqKDqWqdPLxV"), null);
   assert.equal(spaceLink("short"), null);
 });
