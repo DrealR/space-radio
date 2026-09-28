@@ -10,6 +10,7 @@ CrewLookup does the paid I/O around it:
 2. A live room is priced from the probe's id lists, then looked up with names:
    the whole crew if the ledger can hold everyone plus a small margin and the
    request carries a ticket from the radio's own search, else the host alone.
+   That lookup returns the Space again, so it pays a second Space read too.
 
 Several requests can arrive at once. Each paid step reserves its worst case under
 a lock before X is called and settles what X billed afterwards. A request for a room
@@ -158,23 +159,24 @@ class CrewLookup:
     # ---- the paid steps ---------------------------------------------------------------------
     def _probe(self, sid: str) -> dict:
         """The Space alone: state, counts and id lists. Pays one Space read, never names."""
-        held = self._reserve_space(sid)
+        room = self._reserve_space(sid)
         try:
             body = self._call(sid, "probe")
         except BaseException:
-            if held:
-                self._spaces.release(held)
+            self._spaces.release(room)
             raise
-        if held:
-            came_back = isinstance(body, dict) and isinstance(body.get("data"), dict)
-            self._spaces.settle(held, [sid] if came_back else [])
+        self._settle_space(room, body, sid)
         stray = billed_ids(body, sid)  # X names nobody on a probe; if it ever does, it bills them
         if stray:
             self._users.charge(stray)
         return body
 
+    def _settle_space(self, held: frozenset, body, sid: str) -> None:
+        came_back = isinstance(body, dict) and isinstance(body.get("data"), dict)
+        self._spaces.settle(held, [sid] if came_back else [])
+
     def _reserve_space(self, sid: str) -> frozenset:
-        """Hold one Space read for the probe. X bills it even if the dial saw the room today."""
+        """Hold one Space read. X bills it even if the dial or the probe saw the room today."""
         held = self._spaces.try_reserve(1, tag=sid)
         if held is None:
             raise self._refuse(sid, "probe", "budget", f"crew Space-read cap ${self._spaces.cap:.2f} reached")
@@ -194,10 +196,17 @@ class CrewLookup:
 
     def _named(self, sid: str, mode: str, held: frozenset, need: int) -> CrewScan:
         try:
-            body = self._call(sid, mode)
+            room = self._reserve_space(sid)  # the named lookup returns the Space again
         except BaseException:
             self._users.release(held)
             raise
+        try:
+            body = self._call(sid, mode)
+        except BaseException:
+            self._users.release(held)
+            self._spaces.release(room)
+            raise
+        self._settle_space(room, body, sid)
         billed = billed_ids(body, sid)
         self._users.settle(held, billed)
         if len(billed) > need:

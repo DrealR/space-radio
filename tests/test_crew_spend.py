@@ -170,7 +170,7 @@ class CrewSpaceLedgerTests(TmpCase):
         self.band.charge([f"room{i}" for i in range(90)])  # $0.45 of $0.50
         crew.scan(SID)
         self.assertTrue(self.band.can_afford(10))
-        self.assertAlmostEqual(self.spaces.ledger().spent, PRICE_PER_SPACE)
+        self.assertAlmostEqual(self.spaces.ledger().spent, 2 * PRICE_PER_SPACE)  # probe + named lookup
 
     def test_a_spent_space_cap_refuses_new_rooms_without_calling_x(self):
         fake = FakeCrewX(crew_body())

@@ -29,7 +29,7 @@ from .budget import (DEFAULT_CREW_DAILY_CAP, DEFAULT_CREW_SPACE_CAP, DEFAULT_DAI
                      PRICE_PER_USER, Budget)
 from .crew import LIVE_SECONDS, MESSAGES, SETTLED_SECONDS, CrewError, CrewLookup, valid_crew_id
 from .fixtures import make_fake_fetch
-from .sources import SourceError, SpaceSource, XApiSource, _http_get_json
+from .sources import SourceError, SpaceSource, StaleRooms, XApiSource, _http_get_json
 from .stations import STATIONS, tune
 from .ticket import Tickets, ticket_key
 from .words import word_from_raw
@@ -115,11 +115,14 @@ class RadioService:
         if not self._source:
             return Reply(200, envelope([], meta={"word": word, "problems": []}), STATUS_SECONDS)
         try:
-            rooms = [r.tagged("yours") for r in self._source.live(word)]
+            found, problems, seconds = self._source.live(word), [], FRESH_SECONDS
+        except StaleRooms as err:  # older rooms beat an empty band
+            found, problems, seconds = err.spaces, [str(err)], TROUBLE_SECONDS
         except SourceError as err:
             return Reply(502, envelope(error=str(err), meta={"word": word}), TROUBLE_SECONDS)
+        rooms = [r.tagged("yours") for r in found]
         return Reply(200, envelope([self._ticketed(r.to_json()) for r in rooms],
-                                   meta={"word": word, "problems": []}), FRESH_SECONDS)
+                                   meta={"word": word, "problems": problems}), seconds)
 
     def crew_raw(self, raw_query: str) -> Reply:
         """GET /api/crew from the raw query string: exactly ?id=<id>, optionally &t=<ticket>."""
@@ -223,8 +226,8 @@ def _log_crash(space_id: str, err: Exception) -> None:
 
 
 def service_from_env(env=os.environ) -> RadioService:
-    """Token from X_BEARER_TOKEN. On Vercel only /tmp is writable, so the
-    budgets there are per-instance soft guards; X's own spending limit is the hard cap.
+    """Token from X_BEARER_TOKEN. On Vercel the budgets live in the Runtime Cache, one tank for
+    every instance (fuel.py); X's prepaid credits stay the hard stop.
     SPACES_RADIO_FAKE=1 swaps X for canned answers (local only, never on Vercel)."""
     fake = env.get("SPACES_RADIO_FAKE") == "1" and "VERCEL" not in env
     default_dir = "/tmp/spaces-radio" if env.get("VERCEL") else str(Path(__file__).resolve().parent.parent / "data")
@@ -254,8 +257,7 @@ def _crew_from_env(env, token: str, budget: Budget, data_dir: Path, fetch, share
     """Names need the key. SPACES_RADIO_CREW=off turns them off with no code change
     (on Vercel, environment changes apply from the next deploy).
     Names and the Space reads made for them get their own ledgers and caps, so crew browsing
-    never touches the dial's ledger; a room the dial already paid for today is read for free.
-    On Vercel every instance keeps its own ledgers in /tmp: X's spending limit is the real cap."""
+    never touches the dial's ledger. X bills those reads even for a room the dial paid for today."""
     if not token or (env.get("SPACES_RADIO_CREW") or "").strip().lower() == "off":
         return None
     names = _budget(shared, data_dir, "crew-names", "x-crew-budget.json",

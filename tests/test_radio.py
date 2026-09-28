@@ -111,7 +111,7 @@ class XApiTests(TmpCase):
         self.assertEqual((rooms[0].listeners, rooms[0].source), (40, "x-api"))
         self.assertIn("state=live", fake.urls[0])
         self.assertIn("query=guitar", fake.urls[0])
-        self.assertEqual(budget.ledger().spent, PRICE_PER_SPACE)
+        self.assertAlmostEqual(budget.ledger().spent, 2 * PRICE_PER_SPACE)  # X bills the ticketed room too
 
     def test_cache_prevents_repeat_calls(self):
         clock = Clock()

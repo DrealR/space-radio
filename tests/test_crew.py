@@ -251,16 +251,16 @@ class CrewLookupTests(TmpCase):
         crew = self.make(fake)
         scan, cached = crew.scan(SID)
         self.assertEqual((scan.mode, cached, len(scan.crew)), ("full", False, 3))
-        # A probe (the Space, no names), then the named lookup.
+        # A probe (the Space, no names), then the named lookup: each returns the Space.
         self.assertEqual([query_of(u).get("expansions", "") for u in fake.urls],
                          ["", "creator_id,host_ids,speaker_ids"])
         self.assertAlmostEqual(self.users.ledger().spent, 3 * PRICE_PER_USER)
-        self.assertAlmostEqual(self.spaces.ledger().spent, PRICE_PER_SPACE)
+        self.assertAlmostEqual(self.spaces.ledger().spent, 2 * PRICE_PER_SPACE)
         self.clock.t += 121
         crew.scan(SID)
         self.assertEqual(len(fake.urls), 4)
         self.assertAlmostEqual(self.users.ledger().spent, 6 * PRICE_PER_USER)
-        self.assertAlmostEqual(self.spaces.ledger().spent, 2 * PRICE_PER_SPACE)
+        self.assertAlmostEqual(self.spaces.ledger().spent, 4 * PRICE_PER_SPACE)
 
     def test_users_x_returns_are_charged_even_when_dropped(self):
         crew = self.make(FakeCrewX(crew_body(users=USERS + [user("99", "bad handle!"), {"name": "no id"}])))

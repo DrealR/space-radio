@@ -1,5 +1,5 @@
 """Stations on the dial. Each station is a few words X matches against Space titles.
-Every word is one search, cached 30 minutes, and every room it returns is billed
+Every word is one search, shared for an hour, and every room it returns is billed
 (about $0.05 per word). So each band keeps to its two best words from the live data.
 Tuned Sep 24 against live data: "music"/"guitar" and "NFL"/"NBA" alone came back nearly empty."""
 from __future__ import annotations

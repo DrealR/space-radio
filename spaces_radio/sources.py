@@ -8,6 +8,7 @@ chats later are one new class each; the dial doesn't change.
 from __future__ import annotations
 
 import json
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -41,6 +42,7 @@ def minutes_ago(seconds: float) -> str:
 
 
 SHARED_FRESH_SECONDS = 3600  # a word's shared answer is bought at most once an hour
+FOLLOW_SECONDS = 25.0        # a request waits this long on this instance's search of the same word
 
 
 class SpaceSource(Protocol):
@@ -53,6 +55,28 @@ def _http_get_json(url: str, token: str, timeout: float = 10.0) -> dict:
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+class _Flight:
+    """One search in progress on this instance. Requests for the same word wait for its answer."""
+
+    def __init__(self):
+        self.done = threading.Event()
+        self.rooms: list[Space] | None = None
+        self.error: BaseException | None = None
+
+    def follow(self) -> list[Space]:
+        if not self.done.wait(FOLLOW_SECONDS):
+            raise SourceError("A search for this word is taking too long; try again soon.")
+        err = self.error
+        if err is None:
+            return self.rooms
+        # A fresh error per waiter: one exception object raised in many threads shares a traceback.
+        if isinstance(err, StaleRooms):
+            raise StaleRooms(str(err), err.spaces, err.age)
+        if isinstance(err, SourceError):
+            raise SourceError(str(err))
+        raise SourceError("The search this request waited on failed.")
 
 
 class XApiSource:
@@ -72,17 +96,64 @@ class XApiSource:
         self._ttl = cache_seconds
         self._fetch = fetch
         self._now = now
+        self._answers = answers  # SharedAnswers: get/put a word's rooms, claim/release/wait on its lease
+        self._lock = threading.Lock()
+        # Replaced whole under the lock, never edited.
         self._cache: dict[str, tuple[float, list[Space]]] = {}
-        self._answers = answers  # SharedAnswers: get(word) -> (age, rooms) | None, put(word, rooms)
+        self._flights: dict[str, _Flight] = {}  # word -> this instance's search in progress
 
     def live(self, topic: str) -> list[Space]:
-        hit = self._cache.get(topic)
-        if hit and self._now() - hit[0] < self._ttl:
-            return hit[1]
+        with self._lock:
+            hit = self._cache.get(topic)
+            if hit and self._now() - hit[0] < self._ttl:
+                return hit[1]
+            flight = self._flights.get(topic)
+            leading = flight is None
+            if leading:
+                flight = _Flight()
+                self._flights = {**self._flights, topic: flight}
+        if not leading:  # this instance is already buying the word: wait for that answer
+            return flight.follow()
+        try:
+            flight.rooms = self._find(topic)
+            return flight.rooms
+        except BaseException as err:
+            flight.error = err
+            raise
+        finally:
+            with self._lock:
+                self._flights = {k: v for k, v in self._flights.items() if k != topic}
+            flight.done.set()
+
+    def _find(self, topic: str) -> list[Space]:
         shelf = self._answers.get(topic) if self._answers else None
         if shelf and shelf[0] < SHARED_FRESH_SECONDS:  # someone bought this word within the hour: free
-            self._cache = {**self._cache, topic: (self._now() - shelf[0], shelf[1])}
+            self._remember(topic, self._now() - shelf[0], shelf[1])
             return shelf[1]
+        if not self._answers:
+            return self._buy(topic, shelf)
+        lease = self._answers.claim(topic)
+        if lease is None:  # another instance is buying this word right now: its answer will be free
+            rooms = self._answers.wait(topic)
+            if rooms is not None:
+                self._remember(topic, self._now(), rooms)
+                return rooms
+            lease = self._answers.claim(topic)  # it gave up (X said no, or no fuel): try once ourselves
+            if lease is None:
+                raise self._still_searching(shelf)
+        try:
+            return self._buy(topic, shelf)
+        finally:
+            self._answers.release(topic, lease)
+
+    @staticmethod
+    def _still_searching(shelf) -> SourceError:
+        if shelf:
+            return StaleRooms(f"Another radio is searching this word: showing rooms from {minutes_ago(shelf[0])}.",
+                              *shelf[::-1])
+        return SourceError("Another radio is searching this word right now; try again in a moment.")
+
+    def _buy(self, topic: str, shelf) -> list[Space]:
         # Hold the worst case before asking, so requests arriving together can't all pass the cap.
         held = self._budget.try_reserve(self._max, tag="search")
         if held is None:
@@ -100,12 +171,18 @@ class XApiSource:
             self._budget.release(held)
             raise
         data = body.get("data") if isinstance(body, dict) else None
-        spaces = [s for s in (_to_space(d, topic) for d in (data if isinstance(data, list) else [])) if s]
-        self._budget.settle(held, [s.id for s in spaces])
-        self._cache = {**self._cache, topic: (self._now(), spaces)}
+        items = data if isinstance(data, list) else []
+        # X bills every room it returns, including the ticketed and ended ones the dial drops.
+        self._budget.settle(held, _returned_ids(items))
+        spaces = [s for s in (_to_space(d, topic) for d in items) if s]
+        self._remember(topic, self._now(), spaces)
         if self._answers:
             self._answers.put(topic, spaces)
         return spaces
+
+    def _remember(self, topic: str, at: float, spaces: list[Space]) -> None:
+        with self._lock:
+            self._cache = {**self._cache, topic: (at, spaces)}
 
     def _search(self, topic: str):
         query = urllib.parse.urlencode({
@@ -126,6 +203,12 @@ def _explain_http(code: int) -> str:
         403: "X says this key can't search Spaces (403).",
         429: "X rate limit hit (429); try again in a few minutes.",
     }.get(code, f"X returned an error ({code}).")
+
+
+def _returned_ids(items: list) -> list[str]:
+    """Every room X returned, kept or not. One whose id can't be read was still billed."""
+    return [str(d.get("id") or f"unread-{n}")[:40] if isinstance(d, dict) else f"unread-{n}"
+            for n, d in enumerate(items)]
 
 
 def _to_space(item: dict, topic: str) -> Space | None:

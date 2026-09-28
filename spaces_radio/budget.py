@@ -18,6 +18,7 @@ from __future__ import annotations
 import itertools
 import json
 import os
+import secrets
 import threading
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -30,7 +31,17 @@ DEFAULT_DAILY_CAP = 0.60        # dollars; ~120 rooms returned a day (every requ
 DEFAULT_CREW_DAILY_CAP = 0.40   # dollars; ~40 names a day (a full crew is ~9-15)
 DEFAULT_CREW_SPACE_CAP = 0.10   # dollars; ~20 rooms a day looked up by name, off the dial's ledger
 
-_holds = itertools.count()      # reservation keys are unique within this process
+INSTANCE = secrets.token_hex(4)  # this server process: two Vercel instances can share a pid, never this
+_serials = itertools.count()
+
+
+def mint(prefix: str = "") -> str:
+    """A key no other call, in this process or another instance, will ever mint."""
+    return f"{prefix}{INSTANCE}.{next(_serials)}"
+
+
+def hold_keys(count: int, tag: str = "") -> frozenset:
+    return frozenset(mint(f"hold-{tag}-") for _ in range(max(0, count)))
 
 
 def utc_day(now: datetime | None = None) -> str:
@@ -86,7 +97,7 @@ class Budget:
     def try_reserve(self, count: int, tag: str = "") -> Optional[frozenset]:
         """Hold room for `count` new ids. Returns the held keys (settle or release them), or
         None, holding nothing, when the worst case could pass the cap."""
-        keys = frozenset(f"hold-{tag}-{os.getpid()}-{next(_holds)}" for _ in range(max(0, count)))
+        keys = hold_keys(count, tag)
         with self._lock:
             current = self.ledger()
             if not self._fits(current, len(keys)):
