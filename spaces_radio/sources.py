@@ -7,6 +7,7 @@ chats later are one new class each; the dial doesn't change.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import threading
 import time
@@ -16,6 +17,7 @@ import urllib.request
 from typing import Callable, Protocol
 
 from .budget import Budget
+from .crew_parse import clean_title
 from .space import Space, host_id_list, non_negative_int, parse_space_id
 
 SEARCH_URL = "https://api.x.com/2/spaces/search"
@@ -203,7 +205,8 @@ class XApiSource:
             return self._fetch(f"{SEARCH_URL}?{query}", self._token)
         except urllib.error.HTTPError as err:
             raise SourceError(_explain_http(err.code)) from err
-        except (urllib.error.URLError, TimeoutError, ValueError) as err:
+        # A connection that dies mid-answer is still just a source that couldn't be reached.
+        except (urllib.error.URLError, http.client.HTTPException, OSError, TimeoutError, ValueError) as err:
             raise SourceError(f"Couldn't reach X ({err}).") from err
 
 
@@ -233,7 +236,7 @@ def _to_space(item: dict, topic: str) -> Space | None:
     host_ids = _unique_ids(item.get("host_ids"))
     return Space(
         id=space_id,
-        title=str(item.get("title") or "Untitled room")[:200],
+        title=clean_title(item.get("title")),
         listeners=non_negative_int(item.get("participant_count")),
         # A host on the mic is still one person: speakers are the others at the mic.
         speakers=len(_unique_ids(item.get("speaker_ids")) - host_ids),

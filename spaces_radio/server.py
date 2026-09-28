@@ -23,6 +23,7 @@ from .service import Reply, RadioService, dock_post, envelope, service_from_env,
 
 PUBLIC = Path(__file__).resolve().parent.parent / "public"
 PORT = int(os.environ.get("SPACES_RADIO_PORT", "8740"))
+MAX_BODY = 4096  # a docking beat (api/dock.py)
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
          ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json"}
 
@@ -50,8 +51,11 @@ def make_handler(service: RadioService):
         def do_POST(self):
             if urlparse(self.path).path != "/api/dock":
                 return write_reply(self, Reply(404, envelope(error="Not found.")))
-            length = int(self.headers.get("Content-Length") or 0)
-            body = self.rfile.read(length) if 0 < length <= 4096 else b""
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except (TypeError, ValueError):
+                return write_reply(self, Reply(400, envelope(error="Content-Length must be an integer.")))
+            body = self.rfile.read(length) if 0 < length <= MAX_BODY else b""
             write_reply(self, dock_post(body))
 
         def _static(self, url_path: str):

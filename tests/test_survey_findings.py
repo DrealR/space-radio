@@ -81,7 +81,6 @@ class XSearchCrashTests(TmpCase):
         if reply.status == 502:
             self.assertTrue(reply.body["error"])
 
-    @unittest.expectedFailure
     def test_a_band_when_x_drops_the_connection_answers_in_words(self):
         for error in (http.client.IncompleteRead(b'{"data": [{"id"', 40),
                     http.client.RemoteDisconnected("closed"),
@@ -89,7 +88,6 @@ class XSearchCrashTests(TmpCase):
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assert_answers_in_words(self.service(error).tune_raw("station=music"), "music")
 
-    @unittest.expectedFailure
     def test_your_own_band_when_x_drops_the_connection_answers_in_words(self):
         with contextlib.redirect_stderr(io.StringIO()):
             self.assert_answers_in_words(self.service(ConnectionResetError(104, "reset")).search_raw("q=guitar"), "guitar")
@@ -125,7 +123,6 @@ class RoomTitleTests(TmpCase):
     dock._clean_text strip control characters and bidi overrides from the very same field; the
     band, which is the surface every listener reads, is the one that does not."""
 
-    @unittest.expectedFailure
     def test_a_room_title_cannot_flip_the_dial_round(self):
         budget = Budget(self.dir / "b.json", clock=lambda: DAY)
         raw = "Guitar hang \u202egypsum\u0007 99$"
@@ -160,7 +157,6 @@ class JunkShelfTests(unittest.TestCase):
     that its own number really is one. A shelf entry that is not the shape this version writes
     takes the whole search down instead of falling back to the last rooms."""
 
-    @unittest.expectedFailure
     def test_a_junk_shelf_entry_shows_the_last_rooms_instead_of_breaking_the_band(self):
         store, clock = MemoryStore(), Clock()
         shelf = answers(store, clock)
@@ -214,7 +210,6 @@ class LocalServerTests(TmpCase):
         response = conn.getresponse()
         return response.status, json.loads(response.read())
 
-    @unittest.expectedFailure
     def test_a_malformed_beat_length_answers_json_instead_of_dropping_the_connection(self):
         with contextlib.redirect_stderr(io.StringIO()):
             status, body = self.beat_with("banana")

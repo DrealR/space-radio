@@ -270,8 +270,10 @@ class SharedAnswers:
         raw = self._get(self._key(word), "answer read")
         if not isinstance(raw, dict) or not isinstance(raw.get("rooms"), list):
             return None
+        if not isinstance(raw.get("at"), (int, float)):
+            return None  # not the shape this version writes: a miss, the same as an empty shelf
         rooms = [s for s in (_space_from(d) for d in raw["rooms"] if isinstance(d, dict)) if s]
-        return max(0.0, self._now() - float(raw.get("at", 0))), rooms
+        return max(0.0, self._now() - float(raw["at"])), rooms
 
     def put(self, word: str, rooms: list[Space]) -> None:
         self._set(self._key(word), {"at": self._now(), "rooms": [r.to_json() for r in rooms]},
