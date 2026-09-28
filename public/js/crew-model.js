@@ -10,7 +10,8 @@ export const RETRY_WAIT_MS = 60_000;   // after "X is busy"
 export const MAX_CREW = 30;
 export const EAR_DOTS = 48;
 
-const SPACE_ID = /^[A-Za-z0-9]{8,13}$/;
+// One rule for a room id, the same one the dial and the server use: 8 to 20 characters.
+const SPACE_ID = /^[A-Za-z0-9]{8,20}$/;
 const TICKET = /^[0-9a-f]{16}$/;
 const USER_ID = /^[0-9]{1,20}$/;
 const USERNAME = /^[A-Za-z0-9_]{1,15}$/;

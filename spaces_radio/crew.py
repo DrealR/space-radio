@@ -14,8 +14,12 @@ CrewLookup does the paid I/O around it:
 
 Several requests can arrive at once. Each paid step reserves its worst case under
 a lock before X is called and settles what X billed afterwards. A request for a room
-that is already being scanned waits for that scan instead of paying again. After X
-refuses the whole app (busy, out of credits, bad key), nobody asks again for a while.
+that is already being scanned waits for that scan instead of paying again. A roster
+named for the host alone is never the answer for a request that came with a ticket:
+that request pays for a scan of its own, and its roster is the one the room keeps,
+unless no scan is possible right now (X is holding the app, the day's names are spent)
+and the host the room already has is still better than an error.
+After X refuses the whole app (busy, out of credits, bad key), nobody asks again for a while.
 """
 from __future__ import annotations
 
@@ -68,6 +72,7 @@ class _Flight:
         self.done = threading.Event()
         self.scan: Optional[CrewScan] = None
         self.error: Optional[BaseException] = None
+        self.priced = False  # this scan was priced for the whole crew, not the host alone
 
 
 class CrewLookup:
@@ -89,7 +94,7 @@ class CrewLookup:
         self._max_calls = max(1, max_calls_per_minute)
         self._lock = threading.Lock()
         # All replaced whole under the lock, never edited.
-        self._cache: dict = {}       # id -> (fetched at, CrewScan)
+        self._cache: dict = {}       # id -> (fetched at, CrewScan, priced for the whole crew)
         self._calls: tuple = ()      # when recent upstream calls happened
         self._flights: dict = {}     # id -> _Flight
         self._hold: tuple = ()       # (reason, until) after X refused the whole app
@@ -101,28 +106,51 @@ class CrewLookup:
 
     def scan(self, space_id: str, trusted: bool = True) -> Tuple[CrewScan, bool]:
         """(CrewScan, served from cache or another request's scan). Raises CrewError;
-        errors are never cached. Untrusted requests (no ticket) get the host at most."""
+        errors are never cached. Untrusted requests (no ticket) get the host at most, and
+        a roster named for the host alone is not the answer for one that came from the dial."""
         sid = valid_crew_id(space_id)
         if not sid:
             raise CrewError("bad-id")
-        with self._lock:
-            at = self._now()
-            hit = self._cache.get(sid)
-            if hit and at - hit[0] < _ttl(hit[1]):
-                return hit[1], True
-            flight = self._flights.get(sid)
-            leading = flight is None
+        while True:
+            with self._lock:
+                at = self._now()
+                hit = self._cache.get(sid)
+                if hit and at - hit[0] < _ttl(hit[1]) and self._answerable(hit[1], hit[2], trusted):
+                    return hit[1], True
+                flight = self._flights.get(sid)
+                leading = flight is None
+                if leading:
+                    try:
+                        self._check_hold(at)
+                        self._floor(sid)
+                    except CrewError:
+                        # It cannot lead a scan (X is holding the app, the day's names are
+                        # spent). A roster the room already has beats an error, so serve it.
+                        if hit and at - hit[0] < _ttl(hit[1]):
+                            return hit[1], True
+                        raise
+                    flight = _Flight()
+                    self._flights = {**self._flights, sid: flight}
             if leading:
-                self._check_hold(at)
-                self._floor(sid)
-                flight = _Flight()
-                self._flights = {**self._flights, sid: flight}
-        return self._lead(sid, at, trusted, flight) if leading else self._follow(flight)
+                return self._lead(sid, at, trusted, flight)
+            scan, cached = self._follow(flight)
+            if self._answerable(scan, flight.priced, trusted):
+                return scan, cached
+            # The scan this request waited on was priced for the host alone, so it doesn't
+            # answer a request that came from the dial: look again, and lead a scan of its own.
+
+    @staticmethod
+    def _answerable(scan: CrewScan, priced: bool, trusted: bool) -> bool:
+        """Can this roster answer this request? A host-only scan was priced for the host,
+        not for everyone: it answers requests without a ticket, never a room the dial
+        handed out with one (whose own scan the ledger can hold, or the ledger says no)."""
+        return not (trusted and scan.mode == "host-only" and not priced)
 
     # ---- one scan per room, shared ------------------------------------------------------
     def _lead(self, sid: str, at: float, trusted: bool, flight: _Flight) -> Tuple[CrewScan, bool]:
         try:
             flight.scan = replace(self._lookup(sid, trusted), fetched_at=_iso_utc(at))
+            flight.priced = trusted  # priced for the whole crew, whoever the crew turns out to be
             return flight.scan, False
         except BaseException as err:
             flight.error = err
@@ -131,7 +159,7 @@ class CrewLookup:
             with self._lock:
                 if flight.scan is not None:
                     fresh = {k: v for k, v in self._cache.items() if at - v[0] < _ttl(v[1])}
-                    self._cache = {**fresh, sid: (at, flight.scan)}
+                    self._cache = {**fresh, sid: (at, flight.scan, flight.priced)}
                 self._flights = {k: v for k, v in self._flights.items() if k != sid}
             flight.done.set()
 

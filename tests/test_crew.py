@@ -211,7 +211,9 @@ class CrewUrlTests(unittest.TestCase):
     def test_ids_must_be_bare(self):
         self.assertEqual(valid_crew_id(SID), SID)
         self.assertEqual(valid_crew_id("1FakeRoom"), "1FakeRoom")
-        for bad in (f"https://x.com/i/spaces/{SID}", SID + "A", "1234567", SID + "\n", " " + SID, None, 12345678):
+        self.assertEqual(valid_crew_id(SID + "abcdefg"), SID + "abcdefg")  # 20: the longest room id
+        for bad in (f"https://x.com/i/spaces/{SID}", SID + "12345678", "1234567", SID + "\n", " " + SID,
+                    None, 12345678):
             self.assertIsNone(valid_crew_id(bad), bad)
         with self.assertRaises(ValueError):
             crew_url(f"x.com/i/spaces/{SID}", "full")
@@ -403,7 +405,7 @@ class CrewServiceTests(TmpCase):
         self.assertReason(svc.crew({}), 400, "bad-id", 0)
         self.assertReason(svc.crew({"id": [""]}), 400, "bad-id", 0)
         self.assertReason(svc.crew({"id": [f"https://x.com/i/spaces/{SID}"]}), 400, "bad-id", 0)
-        self.assertReason(svc.crew({"id": [SID + "A"]}), 400, "bad-id", 0)
+        self.assertReason(svc.crew({"id": [SID + "12345678"]}), 400, "bad-id", 0)
         self.assertEqual(fake.urls, [])
 
     def test_no_crew_lookup_means_no_key(self):

@@ -187,7 +187,9 @@ lookup each return the Space, so a typical room (1 host, 2 co-hosts, 8 speakers)
   room is priced from those id lists, and the whole crew is fetched only if it fits under the cap.
 - **Only rooms the radio found**: `/api/tune` gives each room a ticket (an HMAC of the id and a
   half-hour window, keyed from `X_BEARER_TOKEN` or `SPACES_RADIO_TICKET_KEY`). Without a valid ticket,
-  such as a preset or a scripted request for any id, the crew scan names only the host.
+  such as a preset or a scripted request for any id, the crew scan names only the host. A host-only roster
+  is not kept back from a ticketed listener: if someone without a ticket scanned the room first, that
+  request pays for a scan of its own, exactly as a fresh one would.
 - **Its own caps**: `SPACES_RADIO_CREW_DAILY_CAP` (default **$0.40** of names) and
   `SPACES_RADIO_CREW_SPACE_CAP` (default **$0.10** of Space reads made for names, two per scan), separate
   from the band cap, so names can never starve the dial. X bills those reads even for a room the dial

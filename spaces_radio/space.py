@@ -5,8 +5,10 @@ import re
 from dataclasses import dataclass, replace
 
 # Space ids are short alphanumeric tokens, e.g. 1YqKDqWqdPLxV.
-_ID = re.compile(r"^[A-Za-z0-9]{8,20}$")
-_URL = re.compile(r"(?:x|twitter)\.com/i/spaces/([A-Za-z0-9]{8,20})")
+# One rule for every check on a room id, in the server and on the page: import this.
+ROOM_ID = re.compile(r"^[A-Za-z0-9]{8,20}$")
+ROOM_ID_BODY = ROOM_ID.pattern[1:-1]  # the same rule without its anchors, to embed in a pattern
+_URL = re.compile(r"(?:x|twitter)\.com/i/spaces/(" + ROOM_ID_BODY + ")")
 _DIGITS = re.compile(r"[0-9]{1,12}")
 _USER_ID = re.compile(r"[0-9]{1,20}")
 MAX_HOST_IDS = 10
@@ -51,7 +53,7 @@ def parse_space_id(text: str) -> str | None:
     match = _URL.search(text)
     if match:
         return match.group(1)
-    return text if _ID.match(text) else None
+    return text if ROOM_ID.match(text) else None
 
 
 def non_negative_int(raw) -> int:

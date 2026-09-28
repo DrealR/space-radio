@@ -4,7 +4,8 @@ One test per finding, each named for what a listener notices, each decorated
 @unittest.expectedFailure so the suite stays green: remove a decorator to watch
 that one fail, then put it back. No network and no key: X, the shared relay and
 the budgets are the same fakes the other suites use (tests/test_radio.py,
-tests/test_fuel_races.py, tests/test_dock.py). Nothing here is fixed yet.
+tests/test_fuel_races.py, tests/test_dock.py). The crew cache and the long room id
+are fixed now and their tests run for real; the rest still stand.
 """
 import contextlib
 import http.client
@@ -94,9 +95,9 @@ class XSearchCrashTests(TmpCase):
 
 
 class CrewCacheTests(TmpCase):
-    """crew.py:112 serves any cached roster to any request, so a host-only scan cached by an
-    unticketed request (a preset, a pasted link, a script) is handed to the listener who did get
-    the room from the dial, ticket and all. The mode they were promised is the one they lose."""
+    """crew.py's cache answers a request from the dial with the whole crew. A host-only scan
+    cached by an unticketed request (a preset, a pasted link, a script) is never the answer
+    for the listener who did get the room from the dial, ticket and all."""
 
     def service(self):
         self.spaces = Budget(self.dir / "s.json", daily_cap=1.0, clock=lambda: DAY)
@@ -106,7 +107,6 @@ class CrewCacheTests(TmpCase):
         source = XApiSource("tok", band, fetch=lambda url, token: {"data": [x_item(SID)]})
         return RadioService(source, band, crew, Tickets(b"k"))
 
-    @unittest.expectedFailure
     def test_a_listener_who_got_the_room_from_the_dial_still_gets_the_whole_crew(self):
         with contextlib.redirect_stderr(io.StringIO()):
             svc = self.service()
@@ -168,11 +168,10 @@ class JunkShelfTests(unittest.TestCase):
 
 
 class LongIdTests(TmpCase):
-    """space.py:8 accepts 8-20 characters for a room, so a longer id reaches the dial with a
-    ticket. service.py:47 and crew_parse.CREW_ID stop at 13, so the crew button on that room
-    answers 400 "Only ?id= is accepted." and the listener is told they spelled it wrong."""
+    """One room-id rule, the one space.py sets: 8 to 20 characters. The dial's longest room
+    reaches /api/crew, which scans it instead of answering 400 "Only ?id= is accepted." and
+    telling the listener they spelled it wrong."""
 
-    @unittest.expectedFailure
     def test_a_long_room_id_on_the_dial_can_still_be_scanned(self):
         self.spaces = Budget(self.dir / "s.json", daily_cap=1.0, clock=lambda: DAY)
         self.users = Budget(self.dir / "u.json", daily_cap=0.5, clock=lambda: DAY, price=PRICE_PER_USER)
