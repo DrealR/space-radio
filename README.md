@@ -147,7 +147,9 @@ wall and spoke in chords. **DOCK ⟷** does that for two radios:
 - **One paid search per word per hour.** Each word's rooms are shared from the Runtime Cache for an hour
   (surviving deploys) and kept six hours as a fallback: when fuel or X credits run out, the dial (and your
   own bands) show the last rooms found. A word being searched carries a short lease, so a second request
-  for it, on any instance, waits for that answer instead of paying again.
+  for it, on any instance, waits for that answer instead of paying again. The lease is strict: it counts only
+  once its instance reads it back as its own, and when the relay can't confirm one, nobody pays (the dial says
+  the relay couldn't reserve the search and shows the last rooms it has).
 - **Every room X returns is counted**, including ticketed and ended rooms the dial doesn't show.
 - **Priciest tap:** WHO'S HERE, at about 1¢ per person (a busy room is 10–15¢). OPEN IN X shows the same
   crew for free.
