@@ -139,9 +139,16 @@ wall and spoke in chords. **DOCK ⟷** does that for two radios:
 - **One shared tank.** The band, crew-room and crew-name ledgers live in Vercel's Runtime Cache, so every
   instance adds up to one real daily cap: 60¢ bands + 10¢ crew rooms + 40¢ names = **$1.10/day** by default
   (`SPACES_RADIO_DAILY_CAP`, `SPACES_RADIO_CREW_SPACE_CAP`, `SPACES_RADIO_CREW_DAILY_CAP`).
+- **Races can't erase spending.** The Runtime Cache can only get and set, so two instances writing at once
+  used to overwrite each other's records. Now a ledger only grows (a hold given back is marked, never
+  deleted) and copies merge, so no write or failed write loses a charge. A hold is written, then checked
+  again a beat later: of two instances reaching for the last fuel at once, at most one keeps it. What's
+  left is an instance that stalls longer than that beat; X's own spending limit stays the hard stop.
 - **One paid search per word per hour.** Each word's rooms are shared from the Runtime Cache for an hour
-  (surviving deploys) and kept six hours as a fallback: when fuel or X credits run out, the dial shows the
-  last rooms found.
+  (surviving deploys) and kept six hours as a fallback: when fuel or X credits run out, the dial (and your
+  own bands) show the last rooms found. A word being searched carries a short lease, so a second request
+  for it, on any instance, waits for that answer instead of paying again.
+- **Every room X returns is counted**, including ticketed and ended rooms the dial doesn't show.
 - **Priciest tap:** WHO'S HERE, at about 1¢ per person (a busy room is 10–15¢). OPEN IN X shows the same
   crew for free.
 
@@ -153,21 +160,20 @@ billed nearly every room on every request. So cost follows **how many searches r
 shared cache keeps independent of how many people listen.
 
 - Each search asks for up to 10 rooms (up to about $0.05), and each band runs 2 searches (up to about $0.10).
-- A band's answer is shared for 30 minutes, and an open radio refreshes only every 30 minutes, only while visible.
+- A word's answer is shared for an hour, and an open radio refreshes only every 30 minutes, only while visible.
 - One person listening a few hours on one or two bands: roughly $0.20 to $0.60 an hour of fresh searches at most,
   often less, because the cache is shared. Browsing all ten bands once costs up to about $1.
 - Your own bands work the same way: two words, two searches.
 - **The hard cap lives at X.** In the X Developer Console, set a spending limit per billing cycle (for example $10)
   and leave auto-recharge off. When the limit is hit, X blocks calls and the radio shows "signal trouble".
-- The server also keeps a soft daily guard (`SPACES_RADIO_DAILY_CAP`, default $1.00, counting every room on
-  every call), but on Vercel
-  each instance keeps its own, so don't rely on it as the cap.
+- The server also keeps its own daily cap (the shared tank above, $1.10 by default, counting every room on
+  every call). It stops the radio first; X's limit is the backstop if something slips past it.
 
 ### Crew names cost more
 
 The crew manifest asks X for one Space plus its people: **$0.005 per Space and $0.010 per person**
-(user reads are billed per user returned). Assume every scan is billed in full: a typical room (1 host,
-2 co-hosts, 8 speakers) costs about $0.12 per scan. So names load only when someone asks:
+(user reads are billed per user returned). Assume every scan is billed in full: the probe and the named
+lookup each return the Space, so a typical room (1 host, 2 co-hosts, 8 speakers) costs about $0.12 per scan. So names load only when someone asks:
 
 - **Only a press scans**: the speaker, the C key, TRY AGAIN or REFRESH. Never on load, tuning, band
   switches, SCAN, the 10-minute refresh or PUSH.
@@ -180,18 +186,18 @@ The crew manifest asks X for one Space plus its people: **$0.005 per Space and $
 - **Only rooms the radio found**: `/api/tune` gives each room a ticket (an HMAC of the id and a
   half-hour window, keyed from `X_BEARER_TOKEN` or `SPACES_RADIO_TICKET_KEY`). Without a valid ticket,
   such as a preset or a scripted request for any id, the crew scan names only the host.
-- **Its own caps**: `SPACES_RADIO_CREW_DAILY_CAP` (default **$0.50** of names) and
-  `SPACES_RADIO_CREW_SPACE_CAP` (default **$0.10** of Space reads made for names), separate from the band
-  cap, so names can never starve the dial. A room the dial already paid for today is read for free. Near
-  the cap it degrades to host-only (about $0.01), then rests until midnight UTC. `SPACES_RADIO_CREW=off`
+- **Its own caps**: `SPACES_RADIO_CREW_DAILY_CAP` (default **$0.40** of names) and
+  `SPACES_RADIO_CREW_SPACE_CAP` (default **$0.10** of Space reads made for names, two per scan), separate
+  from the band cap, so names can never starve the dial. X bills those reads even for a room the dial
+  paid for today. Near the cap it degrades to host-only (about $0.02), then rests until midnight UTC. `SPACES_RADIO_CREW=off`
   switches names off.
 - **Safe under load**: every paid call reserves its worst case before asking X and settles what X billed
   afterwards, under a lock, so requests arriving together can't all spend the same last dollar. Two
   requests for one room share one scan. After X answers busy (429), out of credits (402) or refused (401/403),
   nobody asks X again for 30 to 60 seconds; cached rosters still show.
-- **Per instance on Vercel**: like the band cap, these ledgers live in each instance's `/tmp`, so they are
-  soft guards. **X's spending limit is the only hard cap** (keep auto-recharge off). A Vercel WAF rate limit
-  on `/api/crew` (about 10 requests a minute per IP) is the recommended next guard.
+- **Shared on Vercel**: like the band cap, these ledgers live in the one shared tank. **X's spending limit
+  stays the backstop** (keep auto-recharge off). A Vercel WAF rate limit on `/api/crew` (about 10 requests
+  a minute per IP) is the recommended next guard.
 - **OPEN IN X ↗** is always there and free: X's own page shows everyone aboard.
 - Logs keep only the Space id, the person count, the mode and today's crew spend. Never names.
 
