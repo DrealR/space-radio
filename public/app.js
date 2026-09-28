@@ -58,6 +58,7 @@ let state = {
 };
 let flashTimer = 0;
 let userActed = false; // browsers only allow sound after a tap or key press
+let bandRequest = 0;
 
 const set = (patch) => { state = { ...state, ...patch }; render(); };
 // A beamed room (or one re-tuned from the log) rides at the end of the deck, like a preset, until
@@ -159,6 +160,7 @@ async function fetchBand(band) {
 }
 
 async function tuneBand(band, { refresh = false } = {}) {
+  const request = ++bandRequest;
   const switching = !refresh;
   if (switching) {
     crackle();
@@ -166,6 +168,7 @@ async function tuneBand(band, { refresh = false } = {}) {
     savePrefs();
   }
   const res = await fetchBand(band);
+  if (request !== bandRequest) return;
   if (res.error) return set({ loading: false, problems: [res.error] });
   const keepId = switching ? null : state.currentId;
   const live = Array.isArray(res.data) ? res.data.filter((r) => r && parseSpaceId(r.id) === r.id) : [];
