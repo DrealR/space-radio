@@ -113,6 +113,12 @@ class XApiTests(TmpCase):
         self.assertIn("query=guitar", fake.urls[0])
         self.assertAlmostEqual(budget.ledger().spent, 2 * PRICE_PER_SPACE)  # X bills the ticketed room too
 
+    def test_a_ticketed_only_response_is_still_billed(self):
+        src, budget = self.make(FakeX([x_item(ID_B, is_ticketed=True)]))
+
+        self.assertEqual(src.live("guitar"), [])
+        self.assertAlmostEqual(budget.ledger().spent, PRICE_PER_SPACE)
+
     def test_cache_prevents_repeat_calls(self):
         clock = Clock()
         fake = FakeX([x_item(ID_A)])

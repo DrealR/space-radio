@@ -5,7 +5,8 @@ from pathlib import Path
 
 from spaces_radio.budget import Budget
 from spaces_radio.service import FRESH_SECONDS, TROUBLE_SECONDS, RadioService
-from spaces_radio.sources import XApiSource
+from spaces_radio.sources import StaleRooms, XApiSource
+from spaces_radio.space import Space
 from spaces_radio.ticket import Tickets
 from spaces_radio.words import canonical_query, normalize_word, word_from_raw
 from tests.test_radio import FakeX, x_item
@@ -64,6 +65,18 @@ class SearchServiceTests(unittest.TestCase):
         self.assertEqual((reply.status, reply.cdn_seconds), (502, TROUBLE_SECONDS))
         empty = self.make().search_raw("q=guitar")
         self.assertEqual((empty.status, empty.body["data"]), (200, []))
+
+    def test_stale_rooms_from_a_custom_source_are_a_successful_search(self):
+        class OldRooms:
+            def live(self, topic):
+                raise StaleRooms("showing the saved answer", [Space(ID_A, "Older room")], 180)
+
+        budget = Budget(self.dir / "b.json")
+        reply = RadioService(OldRooms(), budget).search_raw("q=guitar")
+
+        self.assertEqual((reply.status, reply.cdn_seconds), (200, TROUBLE_SECONDS))
+        self.assertEqual([room["id"] for room in reply.body["data"]], [ID_A])
+        self.assertEqual(reply.body["meta"]["problems"], ["showing the saved answer"])
 
 
 if __name__ == "__main__":

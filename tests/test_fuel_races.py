@@ -201,6 +201,15 @@ class OneWordOnceTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual([[r.id for r in rooms] for rooms in results], [[ID_A]] * 6)
 
+    def test_two_simultaneous_calls_for_one_uncached_word_share_the_search(self):
+        fake, calls = self.slow_x()
+        src = XApiSource("tok", tank(MemoryStore(), cap=1.0), fetch=fake, now=Clock())
+
+        results = run_together(2, lambda k: src.live("music"))
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([[r.id for r in rooms] for rooms in results], [[ID_A], [ID_A]])
+
     def test_two_instances_asking_one_word_at_once_search_once(self):
         store, clock = MemoryStore(), Clock()
         fake, calls = self.slow_x()
