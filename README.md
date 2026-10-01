@@ -110,6 +110,8 @@ exercise the "ended" and "busy" crew states. It is ignored on Vercel.
 - The X key lives only in the Vercel environment (`X_BEARER_TOKEN`). Listeners never need a key.
 - **One key, many listeners.** `/api/tune` and `/api/search` answers carry `Vercel-CDN-Cache-Control: max-age=1800`,
   so everyone on the same band in the same 30 minutes shares one answer, and X is asked once.
+  A band with no live rooms is shared for an hour (`max-age=3600`) and not searched again inside it: a quiet
+  band costs one search an hour, not one every few minutes.
   Behind the CDN, each word's answer is also kept in the Runtime Cache for an hour, and that survives deploys.
   Any extra query parameter, or any other spelling of the same one (`%6dusic`, a trailing `&`), is refused,
   so nobody can bypass that cache and run up the bill.
@@ -163,6 +165,7 @@ shared cache keeps independent of how many people listen.
 
 - Each search asks for up to 10 rooms (up to about $0.05), and each band runs 2 searches (up to about $0.10).
 - A word's answer is shared for an hour, and an open radio refreshes only every 30 minutes, only while visible.
+- A word X had no live rooms for is also kept an hour (`EMPTY_BAND_SECONDS`), so a quiet band can't buy a search every ten minutes. The catch: a room that starts in that hour shows up when the hour ends.
 - One person listening a few hours on one or two bands: roughly $0.20 to $0.60 an hour of fresh searches at most,
   often less, because the cache is shared. Browsing all ten bands once costs up to about $1.
 - Your own bands work the same way: two words, two searches.

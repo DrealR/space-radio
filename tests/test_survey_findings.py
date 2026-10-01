@@ -132,24 +132,8 @@ class RoomTitleTests(TmpCase):
         self.assertNotIn("\u0007", room.to_json()["title"])
 
 
-class EmptyShelfTests(unittest.TestCase):
-    """sources.py:191 shelves whatever a search found, so an answer with no rooms in it is kept
-    as fresh for a whole hour: the band stays empty for every instance and every listener, and
-    the radio never asks X again, long after X has something to say."""
-
-    def instance(self, store, clock, fake):
-        return XApiSource("tok", tank(store), fetch=fake, now=clock, answers=answers(store, clock))
-
-    @unittest.expectedFailure
-    def test_a_band_x_had_nothing_for_keeps_being_empty_for_the_next_hour(self):
-        store, clock = MemoryStore(), Clock()
-        blip = TappedX([x_item(SID, is_ticketed=True)])   # X has a bad minute: nothing to show
-        self.assertEqual(self.instance(store, clock, blip).live("guitar"), [])
-        clock.t += 300                                      # five minutes on, X is fine again
-        healthy = TappedX([x_item("1OwxWzqXyLbJQ", "Guitar hang", 40)])
-        self.assertEqual([r.id for r in self.instance(store, clock, healthy).live("guitar")],
-                         ["1OwxWzqXyLbJQ"], msg="the empty answer was still fresh; X was never asked")
-        self.assertEqual(len(healthy.urls), 1)
+# Finding 5 (an empty answer is kept as fresh for a whole hour) was Reemy's call, Oct 1: keep the
+# hour, because re-asking sooner buys more paid searches. Its tests live in tests/test_empty_band.py.
 
 
 class JunkShelfTests(unittest.TestCase):

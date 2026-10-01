@@ -29,7 +29,7 @@ from .budget import (DEFAULT_CREW_DAILY_CAP, DEFAULT_CREW_SPACE_CAP, DEFAULT_DAI
                      PRICE_PER_USER, Budget)
 from .crew import LIVE_SECONDS, MESSAGES, SETTLED_SECONDS, CrewError, CrewLookup, valid_crew_id
 from .fixtures import make_fake_fetch
-from .sources import SourceError, SpaceSource, StaleRooms, XApiSource, _http_get_json
+from .sources import EMPTY_BAND_SECONDS, SourceError, SpaceSource, StaleRooms, XApiSource, _http_get_json
 from .space import ROOM_ID_BODY
 from .stations import STATIONS, tune
 from .ticket import Tickets, ticket_key
@@ -116,7 +116,8 @@ class RadioService:
         if not self._source:
             return Reply(200, envelope([], meta={"word": word, "problems": []}), STATUS_SECONDS)
         try:
-            found, problems, seconds = self._source.live(word), [], FRESH_SECONDS
+            found, problems = self._source.live(word), []
+            seconds = FRESH_SECONDS if found else EMPTY_BAND_SECONDS  # a quiet band isn't asked again for an hour
         except StaleRooms as err:  # older rooms beat an empty band
             found, problems, seconds = err.spaces, [str(err)], TROUBLE_SECONDS
         except SourceError as err:
@@ -145,7 +146,7 @@ class RadioService:
             rooms, problems = tune(station, [self._source])
         except SourceError as err:
             return Reply(502, envelope(error=str(err)), TROUBLE_SECONDS)
-        seconds = TROUBLE_SECONDS if problems else FRESH_SECONDS
+        seconds = TROUBLE_SECONDS if problems else FRESH_SECONDS if rooms else EMPTY_BAND_SECONDS
         return Reply(200, envelope([self._ticketed(r.to_json()) for r in rooms],
                                    meta={"station": station, "problems": problems}), seconds)
 

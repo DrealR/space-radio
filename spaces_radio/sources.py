@@ -44,6 +44,7 @@ def minutes_ago(seconds: float) -> str:
 
 
 SHARED_FRESH_SECONDS = 3600  # a word's shared answer is bought at most once an hour
+EMPTY_BAND_SECONDS = 3600    # a word X had no live rooms for is not searched again for an hour
 FOLLOW_SECONDS = 12.0        # a request waits this long on this instance's search of the same word
 
 
@@ -107,7 +108,7 @@ class XApiSource:
     def live(self, topic: str) -> list[Space]:
         with self._lock:
             hit = self._cache.get(topic)
-            if hit and self._now() - hit[0] < self._ttl:
+            if hit and self._now() - hit[0] < (self._ttl if hit[1] else EMPTY_BAND_SECONDS):
                 return hit[1]
             flight = self._flights.get(topic)
             leading = flight is None
